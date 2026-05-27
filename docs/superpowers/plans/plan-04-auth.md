@@ -8,6 +8,29 @@
 
 ---
 
+## Separação de responsabilidades neste plano
+
+```
+Interfaces/
+  IAuthService.cs          ← contrato de register/login/refresh/logout
+  IUserService.cs          ← contrato de GetMe/UpdateMe/stats
+  IUserRepository.cs       ← contrato de queries em UserEntity
+  IRefreshTokenRepository.cs ← contrato de queries em RefreshTokenEntity
+
+Services/
+  JwtService.cs            ← geração/validação de tokens (sem interface — usado internamente)
+  AuthService.cs           ← implementa IAuthService; usa IUserRepository + IRefreshTokenRepository
+  UserService.cs           ← implementa IUserService; usa IUserRepository + AppDbContext (stats)
+
+Repositories/
+  UserRepository.cs        ← implementa IUserRepository; acessa AppDbContext
+  RefreshTokenRepository.cs ← implementa IRefreshTokenRepository; acessa AppDbContext
+```
+
+> **Regra:** `AuthService` e `UserService` NUNCA acessam `AppDbContext` diretamente — sempre via repositório.
+
+---
+
 ## Visão Geral
 
 Três serviços coordenados:

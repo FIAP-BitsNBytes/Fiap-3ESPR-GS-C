@@ -16,21 +16,17 @@ Implements the mission simulation layer of the Mission Clear backend: conjunctio
 
 ```
 MissionClear.Api/
+├── Interfaces/
+│   ├── IConjunctionDetector.cs
+│   ├── ILaunchWindowCalculator.cs
+│   └── IMissionSimulationService.cs
 ├── Services/
-│   ├── Conjunctions/
-│   │   ├── IConjunctionDetector.cs
-│   │   └── ConjunctionDetector.cs
-│   ├── LaunchWindows/
-│   │   ├── ILaunchWindowCalculator.cs
-│   │   └── LaunchWindowCalculator.cs
-│   ├── Missions/
-│   │   ├── IMissionSimulationService.cs
-│   │   └── MissionSimulationService.cs
-│   ├── Sessions/
-│   │   ├── SessionStore.cs
-│   │   └── SessionStoreOptions.cs
-│   └── Streaming/
-│       └── MissionSseService.cs
+│   ├── ConjunctionDetector.cs
+│   ├── LaunchWindowCalculator.cs
+│   ├── MissionSimulationService.cs
+│   ├── SessionStore.cs
+│   ├── SessionStoreOptions.cs
+│   └── MissionSseService.cs
 └── Program.cs (DI registration additions)
 
 MissionClear.Tests/
@@ -41,6 +37,13 @@ MissionClear.Tests/
     ├── SessionStoreTests.cs
     └── MissionSseServiceTests.cs
 ```
+
+> **Regra:** interfaces em `Interfaces/`, implementações em `Services/`. Nunca misturar.
+
+> **Namespaces corretos:**
+> - Arquivos em `Interfaces/` → `namespace MissionClear.Api.Interfaces;`
+> - Arquivos em `Services/` → `namespace MissionClear.Api.Services;` + `using MissionClear.Api.Interfaces;`
+> - Os snippets de código neste plano usam o namespace de interface; nas implementações trocar para `MissionClear.Api.Services`.
 
 No new NuGet packages. No new configuration sections except `SessionStoreOptions` (TTL).
 
@@ -134,7 +137,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
    // IConjunctionDetector.cs
    using MissionClear.Api.Domain;
 
-   namespace MissionClear.Api.Services.Conjunctions;
+   namespace MissionClear.Api.Interfaces;
 
    public interface IConjunctionDetector
    {
@@ -151,7 +154,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
    // ConjunctionDetector.cs
    using MissionClear.Api.Domain;
 
-   namespace MissionClear.Api.Services.Conjunctions;
+   namespace MissionClear.Api.Interfaces;
 
    public sealed class ConjunctionDetector : IConjunctionDetector
    {
@@ -297,7 +300,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
    // ILaunchWindowCalculator.cs
    using MissionClear.Api.Domain;
 
-   namespace MissionClear.Api.Services.LaunchWindows;
+   namespace MissionClear.Api.Interfaces;
 
    public interface ILaunchWindowCalculator
    {
@@ -316,7 +319,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
    using MissionClear.Api.Domain;
    using MissionClear.Api.Services.Conjunctions;
 
-   namespace MissionClear.Api.Services.LaunchWindows;
+   namespace MissionClear.Api.Interfaces;
 
    public sealed class LaunchWindowCalculator : ILaunchWindowCalculator
    {
@@ -463,7 +466,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
     using MissionClear.Api.Domain;
     using MissionClear.Api.Dtos;
 
-    namespace MissionClear.Api.Services.Missions;
+    namespace MissionClear.Api.Interfaces;
 
     public interface IMissionSimulationService
     {
@@ -479,7 +482,7 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
     using MissionClear.Api.Dtos;
     using MissionClear.Api.Services.Conjunctions;
 
-    namespace MissionClear.Api.Services.Missions;
+    namespace MissionClear.Api.Interfaces;
 
     public sealed class MissionSimulationService : IMissionSimulationService
     {
@@ -1020,15 +1023,15 @@ No new NuGet packages. No new configuration sections except `SessionStoreOptions
 
 ## Relevant Files
 
-- `MissionClear.Api/Services/Conjunctions/IConjunctionDetector.cs`
-- `MissionClear.Api/Services/Conjunctions/ConjunctionDetector.cs`
-- `MissionClear.Api/Services/LaunchWindows/ILaunchWindowCalculator.cs`
-- `MissionClear.Api/Services/LaunchWindows/LaunchWindowCalculator.cs`
-- `MissionClear.Api/Services/Missions/IMissionSimulationService.cs`
-- `MissionClear.Api/Services/Missions/MissionSimulationService.cs`
-- `MissionClear.Api/Services/Sessions/SessionStore.cs`
-- `MissionClear.Api/Services/Sessions/SessionStoreOptions.cs`
-- `MissionClear.Api/Services/Streaming/MissionSseService.cs`
+- `MissionClear.Api/Interfaces/IConjunctionDetector.cs`
+- `MissionClear.Api/Services/ConjunctionDetector.cs`
+- `MissionClear.Api/Interfaces/ILaunchWindowCalculator.cs`
+- `MissionClear.Api/Services/LaunchWindowCalculator.cs`
+- `MissionClear.Api/Interfaces/IMissionSimulationService.cs`
+- `MissionClear.Api/Services/MissionSimulationService.cs`
+- `MissionClear.Api/Services/SessionStore.cs`
+- `MissionClear.Api/Services/SessionStoreOptions.cs`
+- `MissionClear.Api/Services/MissionSseService.cs`
 - `MissionClear.Api/Program.cs`
 - `MissionClear.Api/appsettings.json`
 - `MissionClear.Tests/Services/ConjunctionDetectorTests.cs`

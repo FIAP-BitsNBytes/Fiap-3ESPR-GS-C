@@ -959,10 +959,12 @@ Steps:
 ## Arquivos relevantes
 
 - `MissionClear.Api/Configuration/DashboardConstants.cs`
-- `MissionClear.Api/Services/IMissionHistoryService.cs`
-- `MissionClear.Api/Services/MissionHistoryService.cs`
-- `MissionClear.Api/Services/IDashboardService.cs`
-- `MissionClear.Api/Services/DashboardService.cs`
+- `MissionClear.Api/Interfaces/IMissionHistoryService.cs`   ← interface em Interfaces/
+- `MissionClear.Api/Services/MissionHistoryService.cs`       ← impl em Services/
+- `MissionClear.Api/Interfaces/IDashboardService.cs`         ← interface em Interfaces/
+- `MissionClear.Api/Services/DashboardService.cs`            ← impl em Services/
 - `MissionClear.Tests/Services/MissionHistoryServiceTests.cs`
 - `MissionClear.Tests/Services/DashboardServiceTests.cs`
 - `MissionClear.Api/Program.cs` (edit)
+
+> **Namespaces:** interfaces em `MissionClear.Api.Interfaces`, implementações em `MissionClear.Api.Services`.

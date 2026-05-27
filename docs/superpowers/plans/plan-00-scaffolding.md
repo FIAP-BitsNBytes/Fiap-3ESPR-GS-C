@@ -72,59 +72,263 @@ appsettings.Production.json
 
 ## Phase 2: Folder Structure (commit 2)
 
-### Step 2.1: Create folder skeleton with .gitkeep
+### Separação de responsabilidades — regra geral
+
+```
+Cada camada tem UMA responsabilidade. Nunca misturar:
+
+┌─────────────────────────────────────────────────────────────┐
+│  HTTP / Presentation layer                                  │
+│  Controllers/  →  só routing + deserializar + chamar serviço│
+├─────────────────────────────────────────────────────────────┤
+│  Application / Business layer                               │
+│  Services/     →  regras de negócio, orquestração           │
+│  Interfaces/   →  contratos (IFooService, IFooRepository)   │
+├─────────────────────────────────────────────────────────────┤
+│  Data Access layer                                          │
+│  Repositories/ →  queries EF Core, SQL, cache               │
+│  Data/         →  AppDbContext, Migrations                  │
+├─────────────────────────────────────────────────────────────┤
+│  Domain layer                                               │
+│  Models/       →  domain records e value objects            │
+│  Entities/     →  EF Core entities (mapeadas para tabelas)  │
+│  Dtos/         →  request/response bodies da API            │
+├─────────────────────────────────────────────────────────────┤
+│  Cross-cutting                                              │
+│  Exceptions/   →  DomainException e códigos de erro         │
+│  Configuration/→  POCOs de config (JwtSettings etc.)        │
+│  Middleware/   →  GlobalExceptionMiddleware                  │
+│  Cache/        →  OrbitalCache (in-memory thread-safe)       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Onde cada arquivo vai — referência rápida
+
+| Arquivo | Pasta | Motivo |
+|---------|-------|--------|
+| `AuthController.cs` | `Controllers/` | HTTP adapter puro |
+| `IAuthService.cs` | `Interfaces/` | Contrato da camada de serviço |
+| `AuthService.cs` | `Services/` | Regra de negócio (BCrypt, JWT) |
+| `IUserRepository.cs` | `Interfaces/` | Contrato de acesso a dados |
+| `UserRepository.cs` | `Repositories/` | Queries EF Core sobre `UserEntity` |
+| `UserEntity.cs` | `Entities/` | Classe mapeada para tabela `users` |
+| `UserResponse.cs` | `Dtos/` | Body de resposta da API |
+| `OrbitalObject.cs` | `Models/` | Domain record (nunca vai pro banco direto) |
+| `AppDbContext.cs` | `Data/` | EF Core DbContext |
+| `DomainException.cs` | `Exceptions/` | Exceção de domínio com código de erro |
+| `JwtSettings.cs` | `Configuration/` | POCO de config |
+| `GlobalExceptionMiddleware.cs` | `Middleware/` | Middleware ASP.NET |
+| `OrbitalCache.cs` | `Cache/` | Estado compartilhado thread-safe |
+
+### Convenção de nomenclatura
+
+```
+Interface    → IFooService, IFooRepository   (prefixo I)
+Serviço      → FooService                   (sufixo Service)
+Repositório  → FooRepository                (sufixo Repository)
+Controller   → FooController                (sufixo Controller)
+Entidade EF  → FooEntity                    (sufixo Entity)
+DTO request  → FooRequest, CreateFooRequest
+DTO response → FooResponse, FooDto
+```
+
+### Step 2.1: Estrutura completa de pastas
 
 ```
 MissionClear.Api/
-├── Controllers/             (.gitkeep)
+│
+├── Controllers/
+│   ├── BaseApiController.cs          ← helpers: GetUserId(), DomainError()
+│   ├── AuthController.cs             ← POST /api/auth/*
+│   ├── UsersController.cs            ← GET|PUT /api/users/me
+│   ├── StatusController.cs           ← GET /api/status
+│   ├── DebrisController.cs           ← GET /api/debris*
+│   ├── DestinationsController.cs     ← GET /api/destinations
+│   ├── LaunchWindowsController.cs    ← GET /api/launch-windows*
+│   ├── MissionController.cs          ← POST /api/mission/* + SSE
+│   ├── MissionsController.cs         ← GET|DELETE /api/missions/* (histórico)
+│   └── DashboardController.cs        ← GET /api/dashboard/*
+│
+├── Interfaces/                        ← TODOS os contratos aqui
+│   ├── IAuthService.cs
+│   ├── IUserService.cs
+│   ├── IUserRepository.cs
+│   ├── IRefreshTokenRepository.cs
+│   ├── IMissionRepository.cs
+│   ├── IMissionHistoryService.cs
+│   ├── IDashboardService.cs
+│   ├── IDataAggregatorService.cs
+│   ├── IOrbitalEngineService.cs
+│   ├── IConjunctionDetector.cs
+│   └── ILaunchWindowCalculator.cs
+│
 ├── Services/
-│   ├── Background/          (.gitkeep)
-│   ├── Conjunctions/        (.gitkeep)
-│   ├── LaunchWindows/       (.gitkeep)
-│   ├── Missions/            (.gitkeep)
-│   ├── Sessions/            (.gitkeep)
-│   └── Streaming/           (.gitkeep)
+│   ├── AuthService.cs
+│   ├── UserService.cs
+│   ├── MissionHistoryService.cs
+│   ├── DashboardService.cs
+│   ├── DataAggregatorService.cs
+│   ├── OrbitalEngineService.cs
+│   ├── ConjunctionDetector.cs
+│   ├── LaunchWindowCalculator.cs
+│   ├── MissionSimulationService.cs
+│   ├── SessionStore.cs               ← singleton, in-memory
+│   ├── MissionSseService.cs
+│   └── Background/
+│       └── TleIngestionService.cs    ← BackgroundService
+│
+├── Repositories/
+│   ├── UserRepository.cs
+│   ├── RefreshTokenRepository.cs
+│   └── MissionRepository.cs
+│
 ├── Data/
-│   └── Migrations/          (.gitkeep)
-├── Domain/                  (.gitkeep)
-├── Entities/                (.gitkeep)
-├── Dtos/                    (.gitkeep)
-├── Models/                  (.gitkeep)
-├── Exceptions/              (.gitkeep)
-├── Cache/                   (.gitkeep)
-├── Configuration/           (.gitkeep)
-└── Middleware/              (.gitkeep)
+│   ├── AppDbContext.cs
+│   └── Migrations/                   ← gerado por dotnet ef
+│
+├── Entities/                          ← classes mapeadas para tabelas EF Core
+│   ├── UserEntity.cs
+│   ├── RefreshTokenEntity.cs
+│   └── MissionEntity.cs
+│
+├── Models/                            ← domain records (não vão pro banco diretamente)
+│   ├── OrbitalObject.cs
+│   ├── TleRecord.cs
+│   ├── ConjunctionResult.cs
+│   ├── LaunchWindow.cs
+│   ├── MissionSession.cs
+│   ├── MissionDestination.cs
+│   └── RiskLevel.cs
+│
+├── Dtos/                              ← request/response bodies da API
+│   ├── ApiErrorDto.cs
+│   ├── DebrisDto.cs
+│   ├── DestinationDto.cs
+│   ├── ConjunctionDto.cs
+│   ├── LaunchWindowDto.cs
+│   ├── MissionSimulateRequest.cs
+│   ├── MissionSimulateResponse.cs
+│   ├── SessionRequest.cs
+│   ├── SessionCompleteRequest.cs
+│   ├── AuthRegisterRequest.cs
+│   ├── AuthLoginRequest.cs
+│   ├── AuthRefreshRequest.cs
+│   ├── AuthResponse.cs
+│   ├── UserResponse.cs
+│   ├── UpdateUserRequest.cs
+│   ├── MissionHistoryDto.cs
+│   ├── MissionDetailDto.cs
+│   ├── MissionStatsDto.cs
+│   ├── DashboardSummaryResponse.cs
+│   └── DashboardAlertsResponse.cs
+│
+├── Exceptions/
+│   └── DomainException.cs
+│
+├── Cache/
+│   └── OrbitalCache.cs
+│
+├── Configuration/
+│   ├── JwtSettings.cs
+│   ├── OrbitalSettings.cs
+│   ├── ExternalApiSettings.cs
+│   ├── CorsSettings.cs
+│   └── DashboardConstants.cs
+│
+├── Middleware/
+│   └── GlobalExceptionMiddleware.cs
+│
+├── Program.cs
+├── appsettings.json
+└── appsettings.Development.json
 
 MissionClear.Tests/
-├── Configuration/           (.gitkeep)
-├── Services/                (.gitkeep)
-└── Controllers/             (.gitkeep)
+├── Configuration/
+│   └── AppSettingsTests.cs
+├── Services/
+│   ├── ConjunctionDetectorTests.cs
+│   ├── LaunchWindowCalculatorTests.cs
+│   ├── MissionSimulationServiceTests.cs
+│   ├── SessionStoreTests.cs
+│   ├── MissionSseServiceTests.cs
+│   ├── AuthServiceTests.cs
+│   ├── MissionHistoryServiceTests.cs
+│   └── DashboardServiceTests.cs
+├── Repositories/
+│   ├── UserRepositoryTests.cs
+│   └── MissionRepositoryTests.cs
+└── Controllers/
+    ├── TestWebApplicationFactory.cs
+    ├── AuthControllerTests.cs
+    ├── DebrisControllerTests.cs
+    └── MissionsControllerTests.cs
 ```
 
-```bash
-# Create all directories with .gitkeep
+### Fluxo de chamada — exemplo: POST /api/auth/register
+
+```
+HTTP Request
+    ↓
+AuthController.Register()        ← valida shape do body, chama serviço
+    ↓
+IAuthService.RegisterAsync()     ← regra: senha forte? email já existe?
+    ↓
+IUserRepository.ExistsByEmailAsync()  ← query no banco
+IUserRepository.CreateAsync()         ← persiste UserEntity
+IRefreshTokenRepository.CreateAsync() ← persiste RefreshTokenEntity
+    ↓
+JwtService.GenerateAccessToken()  ← gera JWT
+    ↓
+AuthResponse (DTO)                ← retorna para o controller
+    ↓
+HTTP 201 Created
+```
+
+### Regras de dependência (nunca violar)
+
+```
+Controller  →  pode depender de: IFooService
+Service     →  pode depender de: IFooRepository, outros IFooService, JwtService
+Repository  →  pode depender de: AppDbContext
+Controller  →  NUNCA acessa AppDbContext diretamente
+Service     →  NUNCA acessa HttpContext
+Repository  →  NUNCA contém regra de negócio
+Entity      →  NUNCA exposta direto como resposta HTTP (usar DTO)
+```
+
+```powershell
+# Run from repo root in PowerShell
 $dirs = @(
+    # Presentation layer
     "MissionClear.Api/Controllers",
+    # Application layer
+    "MissionClear.Api/Interfaces",
+    "MissionClear.Api/Services",
     "MissionClear.Api/Services/Background",
-    "MissionClear.Api/Services/Conjunctions",
-    "MissionClear.Api/Services/LaunchWindows",
-    "MissionClear.Api/Services/Missions",
-    "MissionClear.Api/Services/Sessions",
-    "MissionClear.Api/Services/Streaming",
+    # Data access layer
+    "MissionClear.Api/Repositories",
+    "MissionClear.Api/Data",
     "MissionClear.Api/Data/Migrations",
-    "MissionClear.Api/Domain",
+    # Domain layer
     "MissionClear.Api/Entities",
-    "MissionClear.Api/Dtos",
     "MissionClear.Api/Models",
+    "MissionClear.Api/Dtos",
+    # Cross-cutting
     "MissionClear.Api/Exceptions",
     "MissionClear.Api/Cache",
     "MissionClear.Api/Configuration",
     "MissionClear.Api/Middleware",
+    # Tests
     "MissionClear.Tests/Configuration",
     "MissionClear.Tests/Services",
+    "MissionClear.Tests/Repositories",
     "MissionClear.Tests/Controllers"
 )
-foreach ($d in $dirs) { New-Item -ItemType Directory -Force $d; New-Item -ItemType File -Force "$d/.gitkeep" }
+foreach ($d in $dirs) {
+    New-Item -ItemType Directory -Force $d | Out-Null
+    New-Item -ItemType File -Force "$d/.gitkeep" | Out-Null
+}
+Write-Host "Folders created."
 ```
 
 - [ ] Commit: `chore: add folder structure with .gitkeep`

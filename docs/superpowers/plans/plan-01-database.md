@@ -6,6 +6,15 @@
 **Dependencies:** `plan-00-scaffolding.md` concluído — solução criada, pacotes `Microsoft.EntityFrameworkCore`, `Microsoft.EntityFrameworkCore.Sqlite`, `Microsoft.EntityFrameworkCore.Design` instalados em `MissionClear.Api`; `Microsoft.EntityFrameworkCore.InMemory` + `FluentAssertions` em `MissionClear.Tests`.
 **Unlocks:** `plan-04-auth.md` (precisa de UserEntity + RefreshTokenEntity), `plan-06-history-dashboard.md` (precisa de MissionEntity).
 
+> **Separação de responsabilidades:**
+> - `Entities/` — classes EF Core mapeadas para tabelas. Nunca expostas direto na API.
+> - `Repositories/` — acesso ao banco via EF Core. Implementam interfaces em `Interfaces/`.
+> - `Data/AppDbContext.cs` — só configura o DbContext, índices, relacionamentos.
+> - `Services/` — usa repositórios via interface. Nunca acessa `AppDbContext` diretamente.
+>
+> Arquivos deste plano: `Entities/UserEntity.cs`, `Entities/RefreshTokenEntity.cs`, `Entities/MissionEntity.cs`, `Data/AppDbContext.cs`.
+> Repositórios (`UserRepository.cs` etc.) são criados no plan-04.
+
 ---
 
 ## Pré-requisitos de Ambiente
