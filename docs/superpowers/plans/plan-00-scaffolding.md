@@ -85,8 +85,12 @@ Cada camada tem UMA responsabilidade. Nunca misturar:
 │  Services/     →  regras de negócio, orquestração           │
 │  Interfaces/   →  contratos (IFooService, IFooRepository)   │
 ├─────────────────────────────────────────────────────────────┤
+│  Calculation layer (funções puras)                          │
+│  Helpers/      →  static classes sem estado e sem DI        │
+│                   OrbitalMath, RiskScoring, MissionScoring  │
+├─────────────────────────────────────────────────────────────┤
 │  Data Access layer                                          │
-│  Repositories/ →  queries EF Core, SQL, cache               │
+│  Repositories/ →  queries EF Core via interface             │
 │  Data/         →  AppDbContext, Migrations                  │
 ├─────────────────────────────────────────────────────────────┤
 │  Domain layer                                               │
@@ -119,6 +123,9 @@ Cada camada tem UMA responsabilidade. Nunca misturar:
 | `JwtSettings.cs` | `Configuration/` | POCO de config |
 | `GlobalExceptionMiddleware.cs` | `Middleware/` | Middleware ASP.NET |
 | `OrbitalCache.cs` | `Cache/` | Estado compartilhado thread-safe |
+| `OrbitalMath.cs` | `Helpers/` | Haversine, ECI→Geodetic, GMST — funções puras |
+| `RiskScoring.cs` | `Helpers/` | Classify(km), ComputeScore() — funções puras |
+| `MissionScoring.cs` | `Helpers/` | Compute(deltaV, risk) → int — funções puras |
 
 ### Convenção de nomenclatura
 
@@ -128,8 +135,22 @@ Serviço      → FooService                   (sufixo Service)
 Repositório  → FooRepository                (sufixo Repository)
 Controller   → FooController                (sufixo Controller)
 Entidade EF  → FooEntity                    (sufixo Entity)
+Helper       → FooMath, FooScoring          (sem sufixo fixo — nome descreve o domínio)
 DTO request  → FooRequest, CreateFooRequest
 DTO response → FooResponse, FooDto
+```
+
+### Quando usar cada camada — decisão rápida
+
+```
+Preciso fazer uma conta/fórmula sem banco e sem HTTP?  → Helpers/
+Preciso orquestrar lógica de negócio?                 → Services/
+Preciso ler/escrever no banco?                        → Repositories/
+Preciso receber/retornar HTTP?                        → Controllers/
+Preciso definir um contrato para DI?                  → Interfaces/
+Preciso mapear uma tabela do banco?                   → Entities/
+Preciso representar um conceito do domínio?           → Models/
+Preciso definir o body de request ou response?        → Dtos/
 ```
 
 ### Step 2.1: Estrutura completa de pastas
@@ -176,6 +197,11 @@ MissionClear.Api/
 │   ├── MissionSseService.cs
 │   └── Background/
 │       └── TleIngestionService.cs    ← BackgroundService
+│
+├── Helpers/                           ← cálculos puros (static, sem DI)
+│   ├── OrbitalMath.cs                 ← Haversine, ECI→Geodetic, GMST, ToRad
+│   ├── RiskScoring.cs                 ← Classify(km), ComputeScore(conjunctions)
+│   └── MissionScoring.cs             ← Compute(deltaV, risk) → mission_score [0-100]
 │
 ├── Repositories/
 │   ├── UserRepository.cs
@@ -245,6 +271,10 @@ MissionClear.Api/
 MissionClear.Tests/
 ├── Configuration/
 │   └── AppSettingsTests.cs
+├── Helpers/
+│   ├── OrbitalMathTests.cs
+│   ├── RiskScoringTests.cs
+│   └── MissionScoringTests.cs
 ├── Services/
 │   ├── ConjunctionDetectorTests.cs
 │   ├── LaunchWindowCalculatorTests.cs
@@ -288,12 +318,29 @@ HTTP 201 Created
 
 ```
 Controller  →  pode depender de: IFooService
-Service     →  pode depender de: IFooRepository, outros IFooService, JwtService
+Service     →  pode depender de: IFooRepository, outros IFooService, JwtService, Helpers.*
 Repository  →  pode depender de: AppDbContext
+Helper      →  ZERO dependências — só System.Math e tipos do domínio
 Controller  →  NUNCA acessa AppDbContext diretamente
+Controller  →  NUNCA chama Helpers diretamente (vai via Service)
 Service     →  NUNCA acessa HttpContext
 Repository  →  NUNCA contém regra de negócio
 Entity      →  NUNCA exposta direto como resposta HTTP (usar DTO)
+```
+
+### Quem usa cada Helper
+
+```
+OrbitalMath    ← OrbitalEngineService (EciToGeodetic, Gmst)
+               ← ConjunctionDetector  (HaversineKm)
+
+RiskScoring    ← ConjunctionDetector      (Classify, ComputeScore)
+               ← LaunchWindowCalculator   (ComputeScore)
+               ← MissionSimulationService (ComputeScore)
+               ← DashboardService         (threshold ConjunctionThresholdKm)
+
+MissionScoring ← MissionSimulationService (Compute)
+               ← MissionHistoryService    (Compute ao salvar no banco)
 ```
 
 ```powershell
@@ -305,6 +352,8 @@ $dirs = @(
     "MissionClear.Api/Interfaces",
     "MissionClear.Api/Services",
     "MissionClear.Api/Services/Background",
+    # Calculation layer (pure functions, no DI)
+    "MissionClear.Api/Helpers",
     # Data access layer
     "MissionClear.Api/Repositories",
     "MissionClear.Api/Data",
@@ -320,6 +369,7 @@ $dirs = @(
     "MissionClear.Api/Middleware",
     # Tests
     "MissionClear.Tests/Configuration",
+    "MissionClear.Tests/Helpers",
     "MissionClear.Tests/Services",
     "MissionClear.Tests/Repositories",
     "MissionClear.Tests/Controllers"
@@ -335,9 +385,310 @@ Write-Host "Folders created."
 
 ---
 
-## Phase 3: Configuration POCOs (commit 3)
+## Phase 3: Helpers — cálculos puros (commit 3)
+
+Criados aqui pois todos os Services (planos 03-06) dependem deles. Nenhuma dependência externa — só `System.Math` e tipos primitivos.
+
+### OrbitalMath
+
+**File:** `MissionClear.Api/Helpers/OrbitalMath.cs`
+
+```csharp
+namespace MissionClear.Api.Helpers;
+
+public static class OrbitalMath
+{
+    public const double EarthRadiusKm = 6371.0;
+    public const double EarthFlattening = 1.0 / 298.257223563; // WGS-84
+    public const double EarthEccentricitySq = 2 * EarthFlattening - EarthFlattening * EarthFlattening;
+
+    public static double ToRad(double deg) => deg * Math.PI / 180.0;
+    public static double ToDeg(double rad) => rad * 180.0 / Math.PI;
+
+    /// <summary>Haversine great-circle distance on a sphere of given radius.</summary>
+    public static double HaversineKm(double lat1Deg, double lon1Deg, double lat2Deg, double lon2Deg, double radiusKm)
+    {
+        var dLat = ToRad(lat2Deg - lat1Deg);
+        var dLon = ToRad(lon2Deg - lon1Deg);
+        var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
+              + Math.Cos(ToRad(lat1Deg)) * Math.Cos(ToRad(lat2Deg))
+              * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
+        return radiusKm * 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
+    }
+
+    /// <summary>Greenwich Mean Sidereal Time in radians.</summary>
+    public static double Gmst(DateTime utc)
+    {
+        var jd = 367.0 * utc.Year
+            - (int)(7.0 * (utc.Year + (int)((utc.Month + 9.0) / 12.0)) / 4.0)
+            + (int)(275.0 * utc.Month / 9.0)
+            + utc.Day + 1721013.5
+            + utc.TimeOfDay.TotalHours / 24.0;
+        var t = (jd - 2451545.0) / 36525.0;
+        var gmstDeg = 280.46061837 + 360.98564736629 * (jd - 2451545.0)
+                    + 0.000387933 * t * t - t * t * t / 38710000.0;
+        return ToRad(gmstDeg % 360.0);
+    }
+
+    /// <summary>Convert ECI (km) to geodetic lat/lon/alt. Bowring iterative method.</summary>
+    public static (double LatDeg, double LonDeg, double AltKm) EciToGeodetic(
+        double xKm, double yKm, double zKm, double gmstRad)
+    {
+        var lonRad = Math.Atan2(yKm, xKm) - gmstRad;
+        var rKm = Math.Sqrt(xKm * xKm + yKm * yKm);
+        var latRad = Math.Atan2(zKm, rKm * (1 - EarthEccentricitySq));
+
+        // Bowring iteration (3 passes — sufficient for LEO)
+        for (var i = 0; i < 3; i++)
+        {
+            var sinLat = Math.Sin(latRad);
+            var n = EarthRadiusKm / Math.Sqrt(1 - EarthEccentricitySq * sinLat * sinLat);
+            latRad = Math.Atan2(zKm + EarthEccentricitySq * n * sinLat, rKm);
+        }
+
+        var sinLat2 = Math.Sin(latRad);
+        var nFinal = EarthRadiusKm / Math.Sqrt(1 - EarthEccentricitySq * sinLat2 * sinLat2);
+        var altKm = rKm / Math.Cos(latRad) - nFinal;
+
+        // Normalize longitude to [-180, 180]
+        var lonDeg = ToDeg(lonRad) % 360.0;
+        if (lonDeg > 180) lonDeg -= 360;
+        if (lonDeg < -180) lonDeg += 360;
+
+        return (ToDeg(latRad), lonDeg, altKm);
+    }
+}
+```
+
+### RiskScoring
+
+**File:** `MissionClear.Api/Helpers/RiskScoring.cs`
+
+```csharp
+using MissionClear.Api.Models;
+
+namespace MissionClear.Api.Helpers;
+
+public static class RiskScoring
+{
+    // Thresholds
+    public const double CriticalKm  = 1.0;
+    public const double HighKm      = 5.0;
+    public const double MediumKm    = 10.0;
+    public const double SafeKm      = 25.0;
+    public const double MaxRadiusKm = 200.0;
+
+    public static RiskLevel Classify(double km) => km switch
+    {
+        < CriticalKm => RiskLevel.Critical,
+        < HighKm     => RiskLevel.High,
+        < MediumKm   => RiskLevel.Medium,
+        _            => RiskLevel.Low
+    };
+
+    /// <summary>
+    /// Aggregated risk score [0, 1] from a set of closest-approach distances.
+    /// Formula: sum of contributions, clamped to 1.
+    /// Contribution per object = max(0, 1 - (d - SAFE_KM) / (MAX_KM - SAFE_KM))
+    /// </summary>
+    public static double ComputeScore(IEnumerable<double> closestApproachesKm)
+    {
+        double total = 0.0;
+        foreach (var d in closestApproachesKm)
+        {
+            if (d >= MaxRadiusKm) continue;
+            total += Math.Max(0.0, 1.0 - (d - SafeKm) / (MaxRadiusKm - SafeKm));
+        }
+        return Math.Min(1.0, total);
+    }
+}
+```
+
+### MissionScoring
+
+**File:** `MissionClear.Api/Helpers/MissionScoring.cs`
+
+```csharp
+namespace MissionClear.Api.Helpers;
+
+public static class MissionScoring
+{
+    public const double MaxDeltaVKmS     = 12.0;
+    public const double EfficiencyWeight = 50.0;
+    public const double SafetyWeight     = 50.0;
+
+    /// <summary>
+    /// Mission score [0, 100].
+    /// efficiency = max(0, 1 - deltaV/12) * 50
+    /// safety     = (1 - riskScore) * 50
+    /// total      = clamp(round(efficiency + safety), 0, 100)
+    /// </summary>
+    public static (double Efficiency, double Safety, int Total) Compute(double deltaVKmS, double riskScore)
+    {
+        var efficiency = Math.Max(0.0, 1.0 - deltaVKmS / MaxDeltaVKmS) * EfficiencyWeight;
+        var safety     = (1.0 - Math.Clamp(riskScore, 0.0, 1.0)) * SafetyWeight;
+        var total      = (int)Math.Clamp(Math.Round(efficiency + safety), 0, 100);
+        return (efficiency, safety, total);
+    }
+}
+```
+
+### Testes dos Helpers (RED → GREEN)
+
+**File:** `MissionClear.Tests/Helpers/OrbitalMathTests.cs`
+
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Helpers;
+using Xunit;
+
+namespace MissionClear.Tests.Helpers;
+
+public class OrbitalMathTests
+{
+    [Fact]
+    public void Haversine_SamePoint_ReturnsZero()
+    {
+        OrbitalMath.HaversineKm(0, 0, 0, 0, OrbitalMath.EarthRadiusKm).Should().BeApproximately(0, 0.001);
+    }
+
+    [Fact]
+    public void Haversine_OneDegreeLatAtEquator_IsAbout111km()
+    {
+        var km = OrbitalMath.HaversineKm(0, 0, 1, 0, OrbitalMath.EarthRadiusKm);
+        km.Should().BeInRange(110, 112);
+    }
+
+    [Fact]
+    public void EciToGeodetic_EquatorialPoint_LatNearZero()
+    {
+        // Point on equator, no inclination
+        var gmst = OrbitalMath.Gmst(new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+        var r = OrbitalMath.EarthRadiusKm + 400; // 400 km LEO
+        var (lat, lon, alt) = OrbitalMath.EciToGeodetic(r, 0, 0, gmst);
+        lat.Should().BeApproximately(0, 0.1);
+        alt.Should().BeApproximately(400, 1.0);
+    }
+
+    [Fact]
+    public void ToRad_And_ToDeg_AreInverse()
+    {
+        OrbitalMath.ToDeg(OrbitalMath.ToRad(45.0)).Should().BeApproximately(45.0, 0.0001);
+    }
+}
+```
+
+**File:** `MissionClear.Tests/Helpers/RiskScoringTests.cs`
+
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Helpers;
+using MissionClear.Api.Models;
+using Xunit;
+
+namespace MissionClear.Tests.Helpers;
+
+public class RiskScoringTests
+{
+    [Theory]
+    [InlineData(0.5, RiskLevel.Critical)]
+    [InlineData(3.0, RiskLevel.High)]
+    [InlineData(7.0, RiskLevel.Medium)]
+    [InlineData(50.0, RiskLevel.Low)]
+    public void Classify_ReturnsCorrectLevel(double km, RiskLevel expected)
+    {
+        RiskScoring.Classify(km).Should().Be(expected);
+    }
+
+    [Fact]
+    public void ComputeScore_NoDebris_ReturnsZero()
+    {
+        RiskScoring.ComputeScore(Array.Empty<double>()).Should().Be(0.0);
+    }
+
+    [Fact]
+    public void ComputeScore_FarDebris_ReturnsZero()
+    {
+        RiskScoring.ComputeScore(new[] { 300.0, 500.0 }).Should().Be(0.0);
+    }
+
+    [Fact]
+    public void ComputeScore_ManyCloseDebris_ClampsToOne()
+    {
+        var many = Enumerable.Repeat(0.1, 100).ToList();
+        RiskScoring.ComputeScore(many).Should().Be(1.0);
+    }
+
+    [Fact]
+    public void ComputeScore_AtBoundary_IsNonZero()
+    {
+        // d = SAFE_KM → contribution = 1.0 - 0 = 1.0 for a single object
+        RiskScoring.ComputeScore(new[] { RiskScoring.SafeKm }).Should().BeApproximately(1.0, 0.001);
+    }
+}
+```
+
+**File:** `MissionClear.Tests/Helpers/MissionScoringTests.cs`
+
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Helpers;
+using Xunit;
+
+namespace MissionClear.Tests.Helpers;
+
+public class MissionScoringTests
+{
+    [Fact]
+    public void Compute_ZeroDeltaV_ZeroRisk_Returns100()
+    {
+        var (_, _, total) = MissionScoring.Compute(0, 0);
+        total.Should().Be(100);
+    }
+
+    [Fact]
+    public void Compute_MaxDeltaV_ZeroRisk_Returns50()
+    {
+        var (_, _, total) = MissionScoring.Compute(MissionScoring.MaxDeltaVKmS, 0);
+        total.Should().Be(50);
+    }
+
+    [Fact]
+    public void Compute_ZeroDeltaV_MaxRisk_Returns50()
+    {
+        var (_, _, total) = MissionScoring.Compute(0, 1.0);
+        total.Should().Be(50);
+    }
+
+    [Fact]
+    public void Compute_MaxDeltaV_MaxRisk_Returns0()
+    {
+        var (_, _, total) = MissionScoring.Compute(MissionScoring.MaxDeltaVKmS, 1.0);
+        total.Should().Be(0);
+    }
+
+    [Fact]
+    public void Compute_IssCruise_TypicalValues()
+    {
+        // deltaV=9.4 → efficiency=(1-9.4/12)*50=10.83; risk=0.1 → safety=45; total=56
+        var (eff, saf, total) = MissionScoring.Compute(9.4, 0.1);
+        eff.Should().BeApproximately(10.83, 0.01);
+        saf.Should().BeApproximately(45.0, 0.01);
+        total.Should().Be(56);
+    }
+}
+```
+
+- [ ] `dotnet test --filter "Helpers"` — todos 13 testes devem passar (GREEN)
+- [ ] Commit: `feat(helpers): add OrbitalMath, RiskScoring, MissionScoring pure calculation classes`
+
+---
+
+## Phase 4: Configuration POCOs (commit 4)
 
 Each POCO has a `SectionName` constant so binding is never hardcoded at the call site.
+
+> **Nota:** `MissionScoring` e `DashboardConstants` foram movidos para `Helpers/` (Phase 3). Aqui ficam apenas POCOs de `IConfiguration`.
 
 ### JwtSettings
 
