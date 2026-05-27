@@ -1,0 +1,4 @@
+<Solution>
+  <Project Path="MissionClear.Api/MissionClear.Api.csproj" />
+  <Project Path="MissionClear.Tests/MissionClear.Tests.csproj" />
+</Solution>

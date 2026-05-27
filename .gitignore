@@ -1,0 +1,10 @@
+obj/
+bin/
+*.user
+.vs/
+.idea/
+*.suo
+*.lock.json
+appsettings.Production.json
+*.db
+*.db-journal
