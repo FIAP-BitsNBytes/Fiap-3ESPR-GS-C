@@ -927,15 +927,7 @@ public sealed class DashboardController(
             displayName = User.FindFirst("display_name")?.Value;
         }
 
-        var result = await dashboardService.GetSummaryAsync(userId, ct);
-
-        // Patch display_name from JWT claims if available
-        if (displayName != null && result.User != null)
-        {
-            // Since record is immutable, reconstruct UserDashboardDto with correct name
-            var patchedUser = result.User with { DisplayName = displayName };
-            result = result with { User = patchedUser };
-        }
+        var result = await dashboardService.GetSummaryAsync(userId, displayName, ct);
 
         return Ok(result);
     }

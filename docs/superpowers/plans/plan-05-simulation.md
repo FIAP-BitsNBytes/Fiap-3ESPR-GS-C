@@ -903,9 +903,10 @@ public sealed class MissionSimulationService : IMissionSimulationService
 >     int MissionScore,
 >     double RiskScore);
 >
-> // ObstacleDto.cs
+> // ObstacleDto.cs — defined in plan-02. Use EXACTLY this 5-field definition:
 > public sealed record ObstacleDto(
 >     string DebrisId,
+>     string DebrisName,
 >     double ClosestApproachKm,
 >     string TimeOfClosestApproach,
 >     string RiskLevel);
@@ -915,8 +916,14 @@ public sealed class MissionSimulationService : IMissionSimulationService
 > // DepartureTime and ArrivalTime are ISO 8601 strings (e.g. "2025-05-27T14:32:00Z")
 > // The implementation parses them to DateTime internally.
 >
-> // SessionResponse.cs
-> public sealed record SessionResponse(string SessionId, string StreamUrl);
+> // SessionResponse.cs — defined in plan-02. Use EXACTLY this 6-field definition:
+> public sealed record SessionResponse(
+>     string SessionId,
+>     string Destination,
+>     string DepartureTime,
+>     string ArrivalTime,
+>     string StreamUrl,
+>     string ExpiresAt);
 >
 > // CompleteSessionRequest.cs
 > public sealed record CompleteSessionRequest(string Status, bool SaveToHistory = false);

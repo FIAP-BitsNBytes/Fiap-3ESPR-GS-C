@@ -828,11 +828,11 @@ public sealed class UserService(IUserRepository userRepo, IMissionRepository mis
         var successRate = stats.Total == 0 ? 0.0 : Math.Round((double)stats.Successful / stats.Total, 2);
 
         return new UserProfileResponse(
-            user.Id,
+            $"usr_{user.Id:N}",
             user.Email,
             user.DisplayName,
             user.Role,
-            user.CreatedAt,
+            user.CreatedAt.ToString("O"),
             new UserStatsDto(
                 stats.Total,
                 stats.Successful,
