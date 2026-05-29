@@ -249,9 +249,8 @@ Tipos: `feat`, `fix`, `refactor`, `docs`, `test`, `chore`, `perf`, `ci`
 
 ## Bootstrap de Sessão
 
-Em toda sessão nova, executar em paralelo:
-1. `obsidian: vault_bootstrap`
-2. `fenix: intelligence → memory_search, query="Mission Clear"` — time: **FIAP**
+Em toda sessão nova:
+1. `fenix: intelligence → memory_search, query="Mission Clear"` — time: **FIAP**
 
 Após o bootstrap:
 - Leia `docs/superpowers/plans/architecture-overview.md` para entender o estado atual
