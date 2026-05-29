@@ -15,7 +15,7 @@ public sealed class AppDbContextFactory : IDesignTimeDbContextFactory<AppDbConte
         // Versão do servidor — ajuste conforme necessário p/ o MySQL local
         var serverVersion = new MySqlServerVersion(new Version(8, 0, 0));
         
-        // String dummy p/ geração de código — o AppHost sobrescreve isso em runtime
+        // String dummy p/ geração de código — o runtime usa o valor do appsettings.json
         const string connectionString = "Server=localhost;Port=3306;Database=missionclear;User=root;Password=MissionClear_Dev_2025!;";
 
         optionsBuilder.UseMySql(connectionString, serverVersion);

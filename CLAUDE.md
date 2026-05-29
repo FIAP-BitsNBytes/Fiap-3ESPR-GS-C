@@ -39,7 +39,7 @@ Mobile em repo separado: `Fiap-3ESPR-GS-Mobile`.
 
 ```
 MissionClear.sln
-├── MissionClear.AppHost/        net8.0 — Aspire: MySQL container + api + web
+├── MissionClear.AppHost/        net8.0 — Aspire: api + web orchestration
 ├── MissionClear.ServiceDefaults/ net8.0 — OpenTelemetry, health checks
 ├── MissionClear.Api/            net10.0 — Motor orbital + REST API
 ├── MissionClear.Web/            net10.0 — MVC web (cookie auth, Researcher/Administrator)
