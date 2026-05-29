@@ -737,8 +737,8 @@ namespace MissionClear.Api.Dtos.Mission;
 
 public sealed record SimulateRequest(
     [Required] string Destination,
-    DateTime DepartureUtc,
-    DateTime ArrivalUtc);
+    DateTime DepartureTime,
+    DateTime ArrivalTime);
 ```
 
 ### Task 6.2 — `Dtos/Mission/SimulateResponse.cs`
@@ -763,14 +763,14 @@ public sealed record ObstacleDto(
     string RiskLevel);
 
 public sealed record SimulateResponse(
-    string SessionId,
     string Destination,
-    DateTime DepartureUtc,
-    DateTime ArrivalUtc,
+    DateTime DepartureTime,
+    DateTime ArrivalTime,
     IReadOnlyList<object> Trajectory,
     IReadOnlyList<ObstacleDto> Obstacles,
     int MissionScore,
-    double RiskScore);
+    double RiskScore,
+    double DeltaVKmS);
 ```
 
 ### Task 6.3 — `Dtos/Mission/SessionRequest.cs`
@@ -1191,7 +1191,7 @@ public class DtoCompileTests
         // Mission
         _ = new SimulateRequest("ISS", DateTime.UtcNow, DateTime.UtcNow.AddHours(6));
         _ = new ObstacleDto("1","n",5.0,"2025-01-01T00:00:00Z","high");
-        _ = new SimulateResponse("sess_1","ISS",DateTime.UtcNow,DateTime.UtcNow.AddHours(6),[],[],87,0.12);
+        _ = new SimulateResponse("ISS",DateTime.UtcNow,DateTime.UtcNow.AddHours(6),[],[],87,0.12,9.4);
         _ = new SessionRequest("ISS","s","e");
         _ = new SessionResponse("sess_1","ISS","s","e","/stream","exp");
         _ = new CompleteSessionRequest("success", false);
