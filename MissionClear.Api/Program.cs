@@ -1,8 +1,10 @@
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.EntityFrameworkCore;
 using System.Text;
 using MissionClear.Api.Configuration;
 using MissionClear.ServiceDefaults;
+using MissionClear.Api.Data;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -21,12 +23,15 @@ builder.Services.Configure<OrbitalSettings>(builder.Configuration.GetSection(Orb
 builder.Services.Configure<ExternalApiSettings>(builder.Configuration.GetSection(ExternalApiSettings.SectionName));
 builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSettings.SectionName));
 
-// ── Database (MySQL via Aspire service discovery) ───────────────────────────
-// "missionclear" = nome do database registrado no AppHost
-if (Environment.GetEnvironmentVariable("EF_DESIGN_TIME") != "true")
+// ── Database (Local MySQL) ──────────────────────────────────────────────────
+var connectionString = builder.Configuration.GetConnectionString("missionclear") 
+    ?? throw new InvalidOperationException("Connection string 'missionclear' not found.");
+
+builder.Services.AddDbContext<AppDbContext>(options =>
 {
-    builder.AddMySqlDbContext<MissionClear.Api.Data.AppDbContext>("missionclear");
-}
+    var serverVersion = ServerVersion.AutoDetect(connectionString);
+    options.UseMySql(connectionString, serverVersion);
+});
 
 // ── HTTP clients ─────────────────────────────────────────────────────────────
 builder.Services.AddHttpClient();
