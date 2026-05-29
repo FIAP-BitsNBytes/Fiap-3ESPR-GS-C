@@ -66,7 +66,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     });
 
 builder.Services.AddAuthorization();
-builder.Services.AddControllers();
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = System.Text.Json.JsonNamingPolicy.SnakeCaseLower;
+        opts.JsonSerializerOptions.DefaultIgnoreCondition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull;
+        opts.JsonSerializerOptions.WriteIndented = false;
+    });
 
 // ── DI registrations (preenchido nas fases seguintes) ───────────────────────
 builder.Services.AddScoped<MissionClear.Api.Data.Repositories.IUserRepository, MissionClear.Api.Data.Repositories.UserRepository>();
