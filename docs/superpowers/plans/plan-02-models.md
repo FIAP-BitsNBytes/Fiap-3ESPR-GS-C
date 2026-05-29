@@ -1,58 +1,143 @@
-# Plan 02 — Domain Models & API DTOs
+# Plan 02 — Domain Models + DTOs + DomainException
 
-**Execution order:** After plan-00. Parallel with plan-01.
-**Estimated time:** 30 minutes.
-**Goal:** Definir todos os records de domínio (LEO objects, conjunções, janelas, sessões, destinos) e todos os DTOs JSON snake_case do contrato de API — base imutável usada por todos os outros planos.
-**Dependencies:** plan-00-scaffolding.md complete (projeto `MissionClear.Api` criado, `MissionClear.Tests` referenciando o Api).
-**Unlocks:** plan-03-orbital, plan-04-auth, plan-05-mission, plan-06-history-dashboard, plan-07-controllers — todos consomem estes tipos.
-
----
-
-## Diretrizes globais (válidas para todos os arquivos deste plano)
-
-- `<Nullable>enable</Nullable>` no `.csproj` (já feito em plan-00). Toda string default = `string.Empty`, nunca `null`.
-- Todos os DTOs são `record` (imutáveis), com `init`-only properties.
-- Toda propriedade JSON tem `[JsonPropertyName("snake_case")]` — namespace `System.Text.Json.Serialization`.
-- Records de domínio (não-DTO) podem usar PascalCase puro, sem atributos JSON.
-- Nenhum arquivo passa de 200 linhas. Um tipo por arquivo (exceto enums pequenos colocados junto do record que os usa).
-- Após cada Phase: `dotnet build` deve compilar limpo. Ao final do plano: `dotnet test` roda os testes de compile-check.
+**Execution order:** After plan-00 / phase-01. Parallel with nothing — other phases depend on this.
+**Estimated time:** 30–40 minutes.
+**Goal:** Criar `DomainException`, todos os domain records e todos os DTOs JSON snake_case do contrato de API — base imutável usada por todos os outros planos.
+**Dependencies:** `MissionClear.Api` compilando limpo (plan-00 / phase-00 completo). `MissionClear.Api/Models/RiskLevel.cs` já existe — manter.
+**Unlocks:** phase-03-orbital, phase-04-auth, phase-05-simulation, phase-06-history-dashboard, phase-07-api-controllers, phase-08-mvc-web — todos consomem estes tipos.
 
 ---
 
-## Phase 1 — Domain Models (records puros, sem JSON)
+## Diretrizes globais
 
-### Task 1.1 — `Models/Domain/OrbitalObject.cs`
+- `<Nullable>enable</Nullable>` no `.csproj` (já feito). Toda string default = `string.Empty`, nunca `null`.
+- Todos os DTOs são `record` (imutáveis), com parâmetros posicionais ou `init`-only properties.
+- Serialização: `JsonSerializerOptions` com `PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower` configurado no `Program.cs` — **não duplicar** `[JsonPropertyName]` em cada propriedade.
+- Records de domínio (não-DTO) usam PascalCase puro, sem atributos JSON.
+- Nenhum arquivo passa de 200 linhas. Um tipo por arquivo (exceto enums pequenos e records auxiliares estreitamente relacionados).
+- Após cada fase: `dotnet build MissionClear.Api` deve compilar limpo.
+- IDs prefixados: `usr_{Guid:N}`, `msn_{Guid:N}`, `sess_{Guid:N}`.
+- Timestamps: `DateTime.UtcNow`, serializados no formato `O` (ISO 8601 UTC).
 
-Criar arquivo `MissionClear.Api/Models/Domain/OrbitalObject.cs`:
+---
+
+## Phase 1 — DomainException
+
+### Task 1.1 — Criar diretório e `DomainException.cs`
+
+**File:** `MissionClear.Api/Exceptions/DomainException.cs`
+
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Exceptions
+```
 
 ```csharp
-namespace MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Exceptions;
+
+/// <summary>
+/// Exceção de domínio com código de erro e HTTP status.
+/// Capturada pelo GlobalExceptionMiddleware e serializada como ApiErrorDto.
+/// </summary>
+public sealed class DomainException(string errorCode, string message, int httpStatus = 400)
+    : Exception(message)
+{
+    public string ErrorCode { get; } = errorCode;
+    public int HttpStatus { get; } = httpStatus;
+}
+```
+
+**Códigos de erro canônicos (section 14 da API_CONTRACT.md):**
+
+| ErrorCode | HttpStatus |
+|---|---|
+| `INVALID_DESTINATION` | 400 |
+| `TIME_RANGE_EXCEEDED` | 400 |
+| `INVALID_TIME_RANGE` | 400 |
+| `MISSING_PARAMETER` | 400 |
+| `INVALID_DATE_FORMAT` | 400 |
+| `INVALID_PASSWORD_FORMAT` | 400 |
+| `INVALID_CURRENT_PASSWORD` | 401 |
+| `INVALID_CREDENTIALS` | 401 |
+| `TOKEN_EXPIRED` | 401 |
+| `INVALID_REFRESH_TOKEN` | 401 |
+| `UNAUTHORIZED` | 401 |
+| `FORBIDDEN` | 403 |
+| `DEBRIS_NOT_FOUND` | 404 |
+| `MISSION_NOT_FOUND` | 404 |
+| `SESSION_NOT_FOUND` | 404 |
+| `EMAIL_ALREADY_EXISTS` | 409 |
+| `SESSION_ALREADY_COMPLETED` | 409 |
+| `CACHE_NOT_READY` | 503 |
+| `INTERNAL_ERROR` | 500 |
+
+**Uso nos Services:**
+```csharp
+throw new DomainException("EMAIL_ALREADY_EXISTS", "Email já cadastrado.", 409);
+throw new DomainException("INVALID_CREDENTIALS", "Email ou senha incorretos.", 401);
+throw new DomainException("MISSION_NOT_FOUND", "Missão não encontrada.", 404);
+throw new DomainException("FORBIDDEN", "Acesso negado.", 403);
+throw new DomainException("CACHE_NOT_READY", "Cache orbital inicializando.", 503);
+throw new DomainException("INVALID_DESTINATION", "Destino inválido. Use ISS, LEO_GENERIC ou SSO.", 400);
+throw new DomainException("SESSION_NOT_FOUND", "Sessão expirada ou não encontrada.", 404);
+throw new DomainException("SESSION_ALREADY_COMPLETED", "Sessão já foi finalizada.", 409);
+```
+
+### Task 1.2 — Build check
+
+```powershell
+dotnet build MissionClear.Api/MissionClear.Api.csproj
+```
+
+---
+
+## Phase 2 — Domain Models
+
+### Task 2.1 — `Models/OrbitalObject.cs`
+
+**File:** `MissionClear.Api/Models/OrbitalObject.cs`
+
+> Manter `MissionClear.Api/Models/RiskLevel.cs` existente — não alterar.
+
+```csharp
+namespace MissionClear.Api.Models;
 
 /// <summary>
 /// Objeto orbital propagado (debris, satélite ou rocket body) em um instante.
 /// Imutável. Produzido pelo OrbitalEngine, consumido pelo ConjunctionDetector e pelos controllers.
+/// Campos TLE/orbit opcionais — presentes apenas quando fetched via /api/debris/{id}.
 /// </summary>
 public sealed record OrbitalObject(
-    string NoradCatId,
+    string Id,
     string Name,
     string Type,
-    double LatitudeDeg,
-    double LongitudeDeg,
+    double Latitude,
+    double Longitude,
     double AltitudeKm,
     double VelocityKmS,
     string Source,
-    DateTime PropagatedAt);
+    DateTime UpdatedAt,
+    string? TleLine1 = null,
+    string? TleLine2 = null,
+    string? TleEpoch = null,
+    double? InclinationDeg = null,
+    double? Eccentricity = null,
+    double? PeriodMinutes = null,
+    double? ApogeeKm = null,
+    double? PerigeeKm = null);
 ```
 
-### Task 1.2 — `Models/Domain/MissionDestination.cs` + `KnownDestinations`
+### Task 2.2 — `Models/MissionDestination.cs` + `KnownDestinations`
 
-Criar `MissionClear.Api/Models/Domain/MissionDestination.cs`:
+**File:** `MissionClear.Api/Models/MissionDestination.cs`
+
+> Valores fixos conforme `API_CONTRACT.md` section 4 e `GET /api/destinations`.
 
 ```csharp
-namespace MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Models;
 
 /// <summary>
 /// Destino orbital pré-definido. AltitudeKm e InclinationDeg alimentam o LaunchWindowCalculator.
+/// LatitudeDeg/LongitudeDeg padrão 0.0 — órbitas tratadas como equatoriais na simulação MVP.
 /// </summary>
 public sealed record MissionDestination(
     string Id,
@@ -62,125 +147,86 @@ public sealed record MissionDestination(
     string Description,
     double DeltaVKmS,
     double MissionDurationHours,
-    string Icon);
+    string Icon,
+    double LatitudeDeg = 0.0,
+    double LongitudeDeg = 0.0);
 
 public static class KnownDestinations
 {
-    public static readonly MissionDestination Iss = new(
-        Id: "ISS",
-        DisplayName: "International Space Station",
-        AltitudeKm: 408,
-        InclinationDeg: 51.6,
-        Description: "Estação Espacial Internacional — órbita inclinada de 51.6 graus.",
-        DeltaVKmS: 9.4,
-        MissionDurationHours: 6.2,
-        Icon: "iss");
+    public static readonly MissionDestination ISS = new(
+        "ISS",
+        "Estação Espacial Internacional",
+        408,
+        51.6,
+        "Órbita da ISS — destino mais popular para missões LEO",
+        9.40,
+        6.2,
+        "iss");
 
     public static readonly MissionDestination LeoGeneric = new(
-        Id: "LEO_GENERIC",
-        DisplayName: "Generic Low Earth Orbit",
-        AltitudeKm: 400,
-        InclinationDeg: 28.5,
-        Description: "Órbita baixa equatorial genérica para satélites de uso geral.",
-        DeltaVKmS: 9.1,
-        MissionDurationHours: 5.5,
-        Icon: "leo");
+        "LEO_GENERIC",
+        "Órbita LEO Genérica",
+        400,
+        28.5,
+        "Órbita baixa padrão para satélites de observação",
+        9.20,
+        5.8,
+        "leo");
 
     public static readonly MissionDestination Sso = new(
-        Id: "SSO",
-        DisplayName: "Sun-Synchronous Orbit",
-        AltitudeKm: 500,
-        InclinationDeg: 97.4,
-        Description: "Órbita sol-síncrona para sensoriamento remoto e meteorologia.",
-        DeltaVKmS: 9.8,
-        MissionDurationHours: 7.1,
-        Icon: "sso");
+        "SSO",
+        "Sun-Synchronous Orbit",
+        500,
+        97.4,
+        "Órbita heliosíncrona — usada por satélites de imageamento",
+        10.10,
+        7.0,
+        "sso");
 
-    public static IReadOnlyList<MissionDestination> AllDestinations { get; } =
-        new[] { Iss, LeoGeneric, Sso };
+    public static readonly IReadOnlyList<MissionDestination> All = [ISS, LeoGeneric, Sso];
 
-    public static IReadOnlyList<string> ValidIds { get; } =
-        AllDestinations.Select(d => d.Id).ToArray();
+    public static MissionDestination? FindById(string id) =>
+        All.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
 
-    public static bool TryGet(string? id, out MissionDestination destination)
-    {
-        destination = Iss;
-        if (string.IsNullOrWhiteSpace(id)) return false;
-
-        foreach (var d in AllDestinations)
-        {
-            if (string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase))
-            {
-                destination = d;
-                return true;
-            }
-        }
-        return false;
-    }
+    public static MissionDestination? Get(string id) => FindById(id);
 }
 ```
 
-### Task 1.3 — `Models/Domain/ConjunctionResult.cs` + `RiskLevel`
+### Task 2.3 — `Models/ConjunctionResult.cs`
 
-Criar `MissionClear.Api/Models/Domain/ConjunctionResult.cs`:
+**File:** `MissionClear.Api/Models/ConjunctionResult.cs`
 
 ```csharp
-namespace MissionClear.Api.Models.Domain;
+using MissionClear.Api.Helpers;
+
+namespace MissionClear.Api.Models;
 
 /// <summary>
 /// Aproximação detectada entre um objeto orbital e uma trajetória de missão.
+/// RiskLevel calculado pelo RiskScoring helper.
 /// </summary>
 public sealed record ConjunctionResult(
     string DebrisId,
     string DebrisName,
     double ClosestApproachKm,
-    DateTime TimeOfClosestApproachUtc,
-    RiskLevel Risk);
-
-public enum RiskLevel
-{
-    Low,
-    Medium,
-    High,
-    Critical
-}
-
-public static class RiskLevelClassifier
-{
-    /// <summary>
-    /// Critical &lt; 1 km, High &lt; 5 km, Medium &lt; 10 km, Low caso contrário.
-    /// </summary>
-    public static RiskLevel Classify(double closestApproachKm)
-    {
-        if (closestApproachKm < 1.0) return RiskLevel.Critical;
-        if (closestApproachKm < 5.0) return RiskLevel.High;
-        if (closestApproachKm < 10.0) return RiskLevel.Medium;
-        return RiskLevel.Low;
-    }
-
-    public static string ToWireString(this RiskLevel level) => level switch
-    {
-        RiskLevel.Critical => "critical",
-        RiskLevel.High => "high",
-        RiskLevel.Medium => "medium",
-        _ => "low"
-    };
-}
+    DateTime TimeOfClosestApproach,
+    RiskLevel RiskLevel);
 ```
 
-### Task 1.4 — `Models/Domain/LaunchWindow.cs`
+### Task 2.4 — `Models/LaunchWindow.cs`
 
-Criar `MissionClear.Api/Models/Domain/LaunchWindow.cs`:
+**File:** `MissionClear.Api/Models/LaunchWindow.cs`
 
 ```csharp
-namespace MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Models;
 
 /// <summary>
 /// Janela temporal de lançamento avaliada. RiskScore in [0,1]; menor é melhor.
+/// IsRecommended = true quando RiskScore &lt; 0.1.
 /// </summary>
 public sealed record LaunchWindow(
-    DateTime StartUtc,
-    DateTime EndUtc,
+    DateTime Start,
+    DateTime End,
     double RiskScore,
     double DeltaVKmS,
     double DurationHours,
@@ -188,870 +234,1040 @@ public sealed record LaunchWindow(
     IReadOnlyList<ConjunctionResult> Conjunctions);
 ```
 
-### Task 1.5 — `Models/Domain/MissionSession.cs` + `SessionStatus`
+### Task 2.5 — `Models/MissionSession.cs`
 
-Criar `MissionClear.Api/Models/Domain/MissionSession.cs`:
+**File:** `MissionClear.Api/Models/MissionSession.cs`
 
 ```csharp
-namespace MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Models;
 
-public enum SessionStatus
-{
-    Active,
-    Success,
-    Failure,
-    Aborted,
-    Expired
-}
+public enum SessionStatus { Active, Completed, Expired }
 
 /// <summary>
 /// Sessão de simulação ao vivo (SSE). Mutável: Status muda quando a simulação termina.
 /// Mantida em memória pelo SessionStore. Não persiste a menos que o usuário peça save_to_history.
+/// TTL padrão: 30 minutos a partir da criação.
 /// </summary>
 public sealed class MissionSession
 {
-    public required string Id { get; init; }
-    public string? UserId { get; init; }
-    public required string DestinationId { get; init; }
-    public required DateTime DepartureTimeUtc { get; init; }
-    public required DateTime ArrivalTimeUtc { get; init; }
-    public required DateTime CreatedAtUtc { get; init; }
-    public required DateTime ExpiresAtUtc { get; init; }
-
+    public string SessionId { get; init; } = $"sess_{Guid.NewGuid():N}";
+    public required string Destination { get; init; }
+    public required DateTime DepartureTime { get; init; }
+    public required DateTime ArrivalTime { get; init; }
+    public DateTime ExpiresAt { get; init; } = DateTime.UtcNow.AddMinutes(30);
+    public required Guid UserId { get; init; }
+    public DateTime CreatedAtUtc { get; init; } = DateTime.UtcNow;
     public SessionStatus Status { get; set; } = SessionStatus.Active;
-    public double? FinalMissionScore { get; set; }
-    public double? FinalRiskScore { get; set; }
-    public double? FinalDeltaVKmS { get; set; }
+    public double RiskScore { get; set; }
+    public double DeltaVKmS { get; set; }
+    public int MissionScore { get; set; }
     public int ObstaclesEncountered { get; set; }
-    public double DurationSeconds { get; set; }
+    public List<ConjunctionResult> Conjunctions { get; } = [];
 
-    public static string NewId() => $"sess_{Guid.NewGuid():N}";
-}
-
-public static class SessionStatusExtensions
-{
-    public static string ToWireString(this SessionStatus status) => status switch
-    {
-        SessionStatus.Active => "active",
-        SessionStatus.Success => "success",
-        SessionStatus.Failure => "failure",
-        SessionStatus.Aborted => "aborted",
-        SessionStatus.Expired => "expired",
-        _ => "active"
-    };
-
-    public static bool TryParse(string? raw, out SessionStatus status)
-    {
-        switch (raw?.ToLowerInvariant())
-        {
-            case "success": status = SessionStatus.Success; return true;
-            case "failure": status = SessionStatus.Failure; return true;
-            case "aborted": status = SessionStatus.Aborted; return true;
-            default: status = SessionStatus.Active; return false;
-        }
-    }
+    public bool IsExpired => DateTime.UtcNow >= ExpiresAt;
 }
 ```
 
-### Task 1.6 — `Models/Tle/TleRecord.cs`
+### Task 2.6 — Build check + commit
 
-Criar `MissionClear.Api/Models/Tle/TleRecord.cs`:
-
-```csharp
-namespace MissionClear.Api.Models.Tle;
-
-/// <summary>
-/// Raw TLE record as fetched from CelesTrak or KeepTrack. Immutable.
-/// </summary>
-public sealed record TleRecord(
-    string NoradCatId,
-    string Name,
-    string Line1,
-    string Line2,
-    string Source,
-    DateTime FetchedAt);
-
-/// <summary>
-/// Raw JSON shape returned by CelesTrak's GP endpoint.
-/// </summary>
-public sealed class CelesTrakGpRecord
-{
-    public int NORAD_CAT_ID { get; set; }
-    public string? OBJECT_NAME { get; set; }
-    public string? OBJECT_TYPE { get; set; }
-    public string? TLE_LINE1 { get; set; }
-    public string? TLE_LINE2 { get; set; }
-    public string? EPOCH { get; set; }
-    public double INCLINATION { get; set; }
-    public double ECCENTRICITY { get; set; }
-    public double APOAPSIS { get; set; }
-    public double PERIAPSIS { get; set; }
-    public double PERIOD { get; set; }
-}
-```
-
-### Task 1.7 — Build check + commit
-
-```bash
+```powershell
 dotnet build MissionClear.Api/MissionClear.Api.csproj
-git add MissionClear.Api/Models/Domain MissionClear.Api/Models/Tle
-git commit -m "feat(models): domain records (OrbitalObject, MissionDestination, ConjunctionResult, LaunchWindow, MissionSession) + TleRecord"
+git add MissionClear.Api/Exceptions/ MissionClear.Api/Models/OrbitalObject.cs MissionClear.Api/Models/MissionDestination.cs MissionClear.Api/Models/ConjunctionResult.cs MissionClear.Api/Models/LaunchWindow.cs MissionClear.Api/Models/MissionSession.cs
+git commit -m "feat(models): DomainException + domain records (OrbitalObject, MissionDestination, ConjunctionResult, LaunchWindow, MissionSession)"
 ```
 
 ---
 
-## Phase 2 — API DTOs: Common, Orbital, Mission
+## Phase 3 — DTOs de Auth
 
-### Task 2.1 — `Models/Dtos/Common/ApiErrorDto.cs`
+**Directory:** `MissionClear.Api/Dtos/Auth/`
 
-Criar `MissionClear.Api/Models/Dtos/Common/ApiErrorDto.cs`:
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Auth
+```
+
+### Task 3.1 — `Dtos/Auth/RegisterRequest.cs`
 
 ```csharp
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 
-namespace MissionClear.Api.Models.Dtos.Common;
+namespace MissionClear.Api.Dtos.Auth;
+
+public sealed record RegisterRequest(
+    [Required][EmailAddress] string Email,
+    [Required][MinLength(8)] string Password,
+    [Required][StringLength(50, MinimumLength = 2)] string DisplayName,
+    string Role = "Researcher");
+```
+
+### Task 3.2 — `Dtos/Auth/LoginRequest.cs`
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+namespace MissionClear.Api.Dtos.Auth;
+
+public sealed record LoginRequest(
+    [Required][EmailAddress] string Email,
+    [Required] string Password);
+```
+
+### Task 3.3 — `Dtos/Auth/RefreshRequest.cs`
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+namespace MissionClear.Api.Dtos.Auth;
+
+public sealed record RefreshRequest([Required] string RefreshToken);
+```
+
+### Task 3.4 — `Dtos/Auth/LogoutRequest.cs`
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+namespace MissionClear.Api.Dtos.Auth;
+
+public sealed record LogoutRequest([Required] string RefreshToken);
+```
+
+### Task 3.5 — `Dtos/Auth/AuthResponse.cs`
+
+> `UserInAuthResponse` inclui `Role` — obrigatório para autorização no Mobile e no MVC.
+> `user.id` usa prefixo `usr_` (gerado pelo UserRepository).
+> `register` retorna sem `total_missions`/`best_score` (usuário novo); `login` retorna com eles.
+
+```csharp
+namespace MissionClear.Api.Dtos.Auth;
 
 /// <summary>
-/// Envelope padronizado de erro. Toda resposta de erro do contrato usa este shape.
+/// Objeto user incluído nas respostas de login e register.
+/// total_missions e best_score são opcionais: null em register (conta nova), populados em login.
 /// </summary>
-public sealed record ApiErrorDto
+public sealed record UserInAuthResponse(
+    string Id,
+    string Email,
+    string DisplayName,
+    string Role,
+    string CreatedAt,
+    int? TotalMissions = null,
+    int? BestScore = null);
+
+public sealed record AuthResponse(
+    UserInAuthResponse User,
+    string AccessToken,
+    string RefreshToken,
+    int ExpiresIn);
+
+public sealed record RefreshTokenResponse(
+    string AccessToken,
+    int ExpiresIn);
+```
+
+### Task 3.6 — Build check + commit
+
+```powershell
+dotnet build MissionClear.Api/MissionClear.Api.csproj
+git add MissionClear.Api/Dtos/Auth/
+git commit -m "feat(dtos): auth DTOs (RegisterRequest, LoginRequest, RefreshRequest, LogoutRequest, AuthResponse)"
+```
+
+---
+
+## Phase 4 — DTOs de User
+
+**Directory:** `MissionClear.Api/Dtos/User/`
+
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/User
+```
+
+### Task 4.1 — `Dtos/User/UserProfileResponse.cs`
+
+> Campos de `stats` conforme `GET /api/users/me` (section 6).
+> `average_score` é `int` no contrato (`"average_score": 81`).
+
+```csharp
+namespace MissionClear.Api.Dtos.User;
+
+public sealed record UserStatsDto(
+    int TotalMissions,
+    int SuccessfulMissions,
+    int FailedMissions,
+    int AbortedMissions,
+    double SuccessRate,
+    int BestScore,
+    int AverageScore,
+    string? FavoriteDestination,
+    double TotalDeltaVKmS);
+
+public sealed record UserProfileResponse(
+    string Id,
+    string Email,
+    string DisplayName,
+    string Role,
+    string CreatedAt,
+    UserStatsDto Stats);
+```
+
+### Task 4.2 — `Dtos/User/UpdateUserRequest.cs`
+
+> `current_password` é obrigatório somente quando `password` está presente — validado no Service.
+
+```csharp
+namespace MissionClear.Api.Dtos.User;
+
+public sealed record UpdateUserRequest(
+    string? DisplayName,
+    string? Password,
+    string? CurrentPassword);
+```
+
+---
+
+## Phase 5 — DTOs Orbitais
+
+**Directories:**
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Orbital
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Common
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Status
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Destination
+```
+
+### Task 5.1 — `Dtos/Orbital/DebrisDto.cs`
+
+> Campos conforme `GET /api/debris` (section 7). Serialização snake_case via `JsonNamingPolicy`.
+
+```csharp
+namespace MissionClear.Api.Dtos.Orbital;
+
+public sealed record DebrisDto(
+    string Id,
+    string Name,
+    string Type,
+    double Latitude,
+    double Longitude,
+    double AltitudeKm,
+    double VelocityKmS,
+    string Source,
+    string UpdatedAt);
+```
+
+### Task 5.2 — `Dtos/Orbital/DebrisDetailDto.cs`
+
+> Campos conforme `GET /api/debris/{id}` (section 7).
+
+```csharp
+namespace MissionClear.Api.Dtos.Orbital;
+
+public sealed record TleDto(
+    string Epoch,
+    string Line1,
+    string Line2);
+
+public sealed record OrbitParamsDto(
+    double InclinationDeg,
+    double Eccentricity,
+    double PeriodMinutes,
+    double ApogeeKm,
+    double PerigeeKm);
+
+public sealed record DebrisDetailDto(
+    string Id,
+    string Name,
+    string Type,
+    double Latitude,
+    double Longitude,
+    double AltitudeKm,
+    double VelocityKmS,
+    string Source,
+    string UpdatedAt,
+    TleDto? Tle,
+    OrbitParamsDto? Orbit);
+```
+
+### Task 5.3 — `Dtos/Orbital/DebrisStatsDto.cs`
+
+> Campos conforme `GET /api/debris/stats` (section 7).
+> `by_altitude_band` usa chaves exatas do contrato: `low_200_500km`, `mid_500_1000km`, `high_1000_2000km`.
+
+```csharp
+namespace MissionClear.Api.Dtos.Orbital;
+
+public sealed record ByTypeDto(
+    int Debris,
+    int Satellite,
+    int RocketBody);
+
+/// <summary>
+/// Snake_case via JsonNamingPolicy produz: low_200_500_km — incorreto.
+/// Usar [JsonPropertyName] explícito apenas neste record para forçar as chaves exatas do contrato.
+/// </summary>
+public sealed record ByAltitudeBandDto(
+    [property: System.Text.Json.Serialization.JsonPropertyName("low_200_500km")] int Low200500km,
+    [property: System.Text.Json.Serialization.JsonPropertyName("mid_500_1000km")] int Mid5001000km,
+    [property: System.Text.Json.Serialization.JsonPropertyName("high_1000_2000km")] int High10002000km);
+
+public sealed record SourcesDto(
+    int Celestrak,
+    int Keeptrack);
+
+public sealed record DebrisStatsDto(
+    int TotalTracked,
+    ByTypeDto ByType,
+    ByAltitudeBandDto ByAltitudeBand,
+    SourcesDto Sources,
+    string LastUpdated);
+```
+
+### Task 5.4 — `Dtos/Common/ApiErrorDto.cs`
+
+> Shape conforme `API_CONTRACT.md` section 3. Todos os error codes de section 14 representados.
+> Capturado e serializado pelo `GlobalExceptionMiddleware` quando `DomainException` é lançada.
+
+```csharp
+namespace MissionClear.Api.Dtos.Common;
+
+public sealed record ApiErrorDto(string Error, string Message, string Timestamp)
 {
-    [JsonPropertyName("error")]
-    public string Error { get; init; } = string.Empty;
+    public static ApiErrorDto From(string code, string message) =>
+        new(code, message, DateTime.UtcNow.ToString("O"));
 
-    [JsonPropertyName("message")]
-    public string Message { get; init; } = string.Empty;
-
-    [JsonPropertyName("timestamp")]
-    public DateTime Timestamp { get; init; } = DateTime.UtcNow;
-
-    public static ApiErrorDto Make(string code, string message) =>
-        new() { Error = code, Message = message, Timestamp = DateTime.UtcNow };
-
-    public static ApiErrorDto InvalidDestination(string id) =>
-        Make("invalid_destination", $"Destino '{id}' não é suportado. Use ISS, LEO_GENERIC ou SSO.");
-
-    public static ApiErrorDto CacheNotReady() =>
-        Make("cache_not_ready", "Cache orbital ainda está aquecendo. Tente novamente em alguns segundos.");
-
+    // Auth
+    public static ApiErrorDto EmailAlreadyExists() =>
+        From("EMAIL_ALREADY_EXISTS", "Este email já está cadastrado.");
     public static ApiErrorDto InvalidCredentials() =>
-        Make("invalid_credentials", "Email ou senha incorretos.");
-
-    public static ApiErrorDto EmailExists() =>
-        Make("email_exists", "Este email já está cadastrado.");
-
+        From("INVALID_CREDENTIALS", "Email ou senha incorretos.");
     public static ApiErrorDto TokenExpired() =>
-        Make("token_expired", "Token de acesso expirado. Use o refresh token.");
-
+        From("TOKEN_EXPIRED", "Token de acesso expirado. Use o refresh token.");
     public static ApiErrorDto InvalidRefreshToken() =>
-        Make("invalid_refresh_token", "Refresh token inválido ou revogado.");
-
-    public static ApiErrorDto Forbidden() =>
-        Make("forbidden", "Você não tem permissão para acessar este recurso.");
-
-    public static ApiErrorDto NotFound(string what) =>
-        Make("not_found", $"{what} não encontrado.");
-
-    public static ApiErrorDto InternalError() =>
-        Make("internal_error", "Erro interno do servidor. Tente novamente.");
-
-    public static ApiErrorDto SessionCompleted() =>
-        Make("session_completed", "Esta sessão já foi finalizada.");
-
+        From("INVALID_REFRESH_TOKEN", "Refresh token inválido ou revogado.");
+    public static ApiErrorDto Unauthorized() =>
+        From("UNAUTHORIZED", "Rota requer autenticação.");
     public static ApiErrorDto InvalidPasswordFormat() =>
-        Make("invalid_password_format", "Senha deve ter no mínimo 8 caracteres, incluindo letras e números.");
-
+        From("INVALID_PASSWORD_FORMAT", "Senha deve ter no mínimo 8 caracteres, 1 maiúscula e 1 número.");
     public static ApiErrorDto InvalidCurrentPassword() =>
-        Make("invalid_current_password", "Senha atual incorreta.");
+        From("INVALID_CURRENT_PASSWORD", "Senha atual incorreta.");
 
+    // Acesso
+    public static ApiErrorDto Forbidden() =>
+        From("FORBIDDEN", "Você não tem permissão para acessar este recurso.");
+
+    // Not found
+    public static ApiErrorDto DebrisNotFound(string id) =>
+        From("DEBRIS_NOT_FOUND", $"Debris '{id}' não encontrado no cache.");
+    public static ApiErrorDto MissionNotFound(string id) =>
+        From("MISSION_NOT_FOUND", $"Missão '{id}' não encontrada.");
+    public static ApiErrorDto SessionNotFound(string id) =>
+        From("SESSION_NOT_FOUND", $"Sessão '{id}' expirada ou não encontrada.");
+
+    // Conflito
+    public static ApiErrorDto SessionAlreadyCompleted() =>
+        From("SESSION_ALREADY_COMPLETED", "Esta sessão já foi finalizada.");
+
+    // Validação orbital
+    public static ApiErrorDto InvalidDestination(string id) =>
+        From("INVALID_DESTINATION", $"Destino '{id}' não é suportado. Use ISS, LEO_GENERIC ou SSO.");
     public static ApiErrorDto TimeRangeExceeded() =>
-        Make("time_range_exceeded", "Intervalo de tempo solicitado excede o limite máximo permitido.");
-
+        From("TIME_RANGE_EXCEEDED", "Período solicitado excede o limite de 48 horas.");
     public static ApiErrorDto InvalidTimeRange() =>
-        Make("invalid_time_range", "Intervalo de tempo inválido: 'from' deve ser anterior a 'to'.");
+        From("INVALID_TIME_RANGE", "arrival_time deve ser posterior a departure_time.");
+    public static ApiErrorDto MissingParameter(string param) =>
+        From("MISSING_PARAMETER", $"Parâmetro obrigatório ausente: '{param}'.");
+    public static ApiErrorDto InvalidDateFormat(string param) =>
+        From("INVALID_DATE_FORMAT", $"Parâmetro '{param}' não está em formato ISO 8601 UTC.");
+
+    // Sistema
+    public static ApiErrorDto CacheNotReady() =>
+        From("CACHE_NOT_READY", "Cache orbital ainda está inicializando. Tente novamente em alguns segundos.");
+    public static ApiErrorDto InternalError() =>
+        From("INTERNAL_ERROR", "Erro interno do servidor. Tente novamente.");
 }
 ```
 
-### Task 2.2 — `Models/Dtos/Common/PaginationDto.cs`
-
-Criar `MissionClear.Api/Models/Dtos/Common/PaginationDto.cs`:
+### Task 5.5 — `Dtos/Common/PaginationDto.cs`
 
 ```csharp
-using System.Text.Json.Serialization;
+namespace MissionClear.Api.Dtos.Common;
 
-namespace MissionClear.Api.Models.Dtos.Common;
-
-public sealed record PaginationDto
+public sealed record PaginationDto(int Page, int Limit, int Total, int TotalPages)
 {
-    [JsonPropertyName("page")] public int Page { get; init; }
-    [JsonPropertyName("limit")] public int Limit { get; init; }
-    [JsonPropertyName("total")] public int Total { get; init; }
-    [JsonPropertyName("total_pages")] public int TotalPages { get; init; }
-
     public static PaginationDto From(int page, int limit, int total)
     {
         var safeLimit = Math.Max(1, limit);
-        var pages = (int)Math.Ceiling(total / (double)safeLimit);
-        return new PaginationDto { Page = page, Limit = safeLimit, Total = total, TotalPages = pages };
+        return new(page, safeLimit, total, (int)Math.Ceiling(total / (double)safeLimit));
     }
 }
 
-public sealed record PagedResponse<T>
-{
-    [JsonPropertyName("data")] public IReadOnlyList<T> Data { get; init; } = Array.Empty<T>();
-    [JsonPropertyName("pagination")] public PaginationDto Pagination { get; init; } = PaginationDto.From(1, 20, 0);
-}
+public sealed record PagedResponse<T>(IReadOnlyList<T> Data, PaginationDto Pagination);
 ```
 
-### Task 2.3 — `Models/Dtos/Common/StatusResponse.cs`
+### Task 5.6 — `Dtos/Common/ConjunctionDto.cs`
+
+> Campos exatos de `ConjunctionDto` / `ObstacleDto` — mesmos no contrato (section 15).
 
 ```csharp
-using System.Text.Json.Serialization;
+namespace MissionClear.Api.Dtos.Common;
 
-namespace MissionClear.Api.Models.Dtos.Common;
-
-public sealed record SourceStatusDto
-{
-    [JsonPropertyName("celestrak")] public string Celestrak { get; init; } = "unknown";
-    [JsonPropertyName("keeptrack")] public string Keeptrack { get; init; } = "unknown";
-}
-
-public sealed record StatusResponse
-{
-    [JsonPropertyName("status")] public string Status { get; init; } = "loading";
-    [JsonPropertyName("tle_count")] public int TleCount { get; init; }
-    [JsonPropertyName("propagated_count")] public int PropagatedCount { get; init; }
-    [JsonPropertyName("last_tle_fetch")] public DateTime? LastTleFetch { get; init; }
-    [JsonPropertyName("last_propagation")] public DateTime? LastPropagation { get; init; }
-    [JsonPropertyName("uptime_seconds")] public long UptimeSeconds { get; init; }
-    [JsonPropertyName("sources")] public SourceStatusDto Sources { get; init; } = new();
-}
+public sealed record ConjunctionDto(
+    string DebrisId,
+    string DebrisName,
+    double ClosestApproachKm,
+    string TimeOfClosestApproach,
+    string RiskLevel);
 ```
 
-### Task 2.4 — `Models/Dtos/Orbital/DebrisDto.cs`
+### Task 5.7 — `Dtos/Common/LaunchWindowDto.cs`
+
+> Campos conforme `GET /api/launch-windows` (section 8).
 
 ```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Dtos.Common;
 
-namespace MissionClear.Api.Models.Dtos.Orbital;
+public sealed record LaunchWindowDto(
+    string Start,
+    string End,
+    double RiskScore,
+    double DeltaVKmS,
+    double DurationHours,
+    bool IsRecommended,
+    IReadOnlyList<ConjunctionDto> Conjunctions);
 
-public sealed record DebrisDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("name")] public string Name { get; init; } = string.Empty;
-    [JsonPropertyName("type")] public string Type { get; init; } = "debris";
-    [JsonPropertyName("latitude")] public double Latitude { get; init; }
-    [JsonPropertyName("longitude")] public double Longitude { get; init; }
-    [JsonPropertyName("altitude_km")] public double AltitudeKm { get; init; }
-    [JsonPropertyName("velocity_km_s")] public double VelocityKmS { get; init; }
-    [JsonPropertyName("source")] public string Source { get; init; } = "celestrak";
-    [JsonPropertyName("updated_at")] public DateTime UpdatedAt { get; init; }
-
-    public static DebrisDto From(OrbitalObject obj) => new()
-    {
-        Id = obj.NoradCatId,
-        Name = obj.Name,
-        Type = obj.Type,
-        Latitude = Math.Round(obj.LatitudeDeg, 4),
-        Longitude = Math.Round(obj.LongitudeDeg, 4),
-        AltitudeKm = Math.Round(obj.AltitudeKm, 2),
-        VelocityKmS = obj.VelocityKmS,
-        Source = obj.Source,
-        UpdatedAt = obj.PropagatedAt
-    };
-}
+/// <summary>
+/// Shape de GET /api/launch-windows — inclui total_windows e safe_windows.
+/// </summary>
+public sealed record LaunchWindowsResponse(
+    string Destination,
+    string From,
+    string To,
+    int TotalWindows,
+    int SafeWindows,
+    IReadOnlyList<LaunchWindowDto> Windows);
 ```
 
-### Task 2.5 — `Models/Dtos/Orbital/DestinationDto.cs`
+### Task 5.8 — `Dtos/Common/BestWindowDto.cs`
+
+> Campos conforme `GET /api/launch-windows/best` (section 8).
 
 ```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Dtos.Common;
 
-namespace MissionClear.Api.Models.Dtos.Orbital;
+public sealed record BestWindowDto(
+    int Rank,
+    string Start,
+    string End,
+    double RiskScore,
+    double DeltaVKmS,
+    double DurationHours,
+    IReadOnlyList<ConjunctionDto> Conjunctions);
 
-public sealed record DestinationDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("display_name")] public string DisplayName { get; init; } = string.Empty;
-    [JsonPropertyName("altitude_km")] public double AltitudeKm { get; init; }
-    [JsonPropertyName("inclination_deg")] public double InclinationDeg { get; init; }
-    [JsonPropertyName("description")] public string Description { get; init; } = string.Empty;
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-    [JsonPropertyName("mission_duration_hours")] public double MissionDurationHours { get; init; }
-    [JsonPropertyName("icon")] public string Icon { get; init; } = string.Empty;
-
-    public static DestinationDto From(MissionDestination d) => new()
-    {
-        Id = d.Id,
-        DisplayName = d.DisplayName,
-        AltitudeKm = d.AltitudeKm,
-        InclinationDeg = d.InclinationDeg,
-        Description = d.Description,
-        DeltaVKmS = d.DeltaVKmS,
-        MissionDurationHours = d.MissionDurationHours,
-        Icon = d.Icon
-    };
-}
+public sealed record BestWindowsResponse(
+    string Destination,
+    string From,
+    string To,
+    IReadOnlyList<BestWindowDto> BestWindows);
 ```
 
-### Task 2.6 — `Models/Dtos/Orbital/ConjunctionDto.cs`
+### Task 5.9 — `Dtos/Status/StatusResponse.cs`
+
+> Campos conforme `GET /api/status` (section 12).
 
 ```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Dtos.Status;
 
-namespace MissionClear.Api.Models.Dtos.Orbital;
+public sealed record SourceStatusDto(string Celestrak, string Keeptrack);
 
-public sealed record ConjunctionDto
-{
-    [JsonPropertyName("debris_id")] public string DebrisId { get; init; } = string.Empty;
-    [JsonPropertyName("debris_name")] public string DebrisName { get; init; } = string.Empty;
-    [JsonPropertyName("closest_approach_km")] public double ClosestApproachKm { get; init; }
-    [JsonPropertyName("time_of_closest_approach")] public DateTime TimeOfClosestApproach { get; init; }
-    [JsonPropertyName("risk_level")] public string RiskLevel { get; init; } = "low";
-
-    public static ConjunctionDto From(ConjunctionResult c) => new()
-    {
-        DebrisId = c.DebrisId,
-        DebrisName = c.DebrisName,
-        ClosestApproachKm = c.ClosestApproachKm,
-        TimeOfClosestApproach = c.TimeOfClosestApproachUtc,
-        RiskLevel = c.Risk.ToWireString()
-    };
-}
+public sealed record StatusResponse(
+    string Status,
+    int TleCount,
+    int PropagatedCount,
+    string? LastTleFetch,
+    string? LastPropagation,
+    long UptimeSeconds,
+    SourceStatusDto Sources);
 ```
 
-### Task 2.7 — `Models/Dtos/Orbital/LaunchWindowDto.cs`
+### Task 5.10 — `Dtos/Destination/DestinationDto.cs`
+
+> Campos conforme `GET /api/destinations` (section 7).
 
 ```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Domain;
+namespace MissionClear.Api.Dtos.Destination;
 
-namespace MissionClear.Api.Models.Dtos.Orbital;
+public sealed record DestinationDto(
+    string Id,
+    string DisplayName,
+    double AltitudeKm,
+    double InclinationDeg,
+    string Description,
+    double DeltaVKmS,
+    double MissionDurationHours,
+    string Icon);
 
-public sealed record LaunchWindowDto
-{
-    [JsonPropertyName("start")] public DateTime Start { get; init; }
-    [JsonPropertyName("end")] public DateTime End { get; init; }
-    [JsonPropertyName("risk_score")] public double RiskScore { get; init; }
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-    [JsonPropertyName("duration_hours")] public double DurationHours { get; init; }
-    [JsonPropertyName("is_recommended")] public bool IsRecommended { get; init; }
-    [JsonPropertyName("conjunctions")] public IReadOnlyList<ConjunctionDto> Conjunctions { get; init; } = Array.Empty<ConjunctionDto>();
-
-    public static LaunchWindowDto From(LaunchWindow w) => new()
-    {
-        Start = w.StartUtc,
-        End = w.EndUtc,
-        RiskScore = w.RiskScore,
-        DeltaVKmS = w.DeltaVKmS,
-        DurationHours = w.DurationHours,
-        IsRecommended = w.IsRecommended,
-        Conjunctions = w.Conjunctions.Select(ConjunctionDto.From).ToArray()
-    };
-}
-
-public sealed record LaunchWindowsResponse
-{
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("from")] public DateTime From { get; init; }
-    [JsonPropertyName("to")] public DateTime To { get; init; }
-    [JsonPropertyName("windows")] public IReadOnlyList<LaunchWindowDto> Windows { get; init; } = Array.Empty<LaunchWindowDto>();
-}
+public sealed record DestinationsResponse(IReadOnlyList<DestinationDto> Destinations);
 ```
 
-### Task 2.8 — `Models/Dtos/Mission/MissionSimulateDto.cs`
+### Task 5.11 — Build check + commit
 
-```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Dtos.Orbital;
-
-namespace MissionClear.Api.Models.Dtos.Mission;
-
-public sealed record MissionSimulateRequest
-{
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-}
-
-public sealed record TrajectoryPointDto
-{
-    [JsonPropertyName("t")] public DateTime TimestampUtc { get; init; }
-    [JsonPropertyName("latitude")] public double Latitude { get; init; }
-    [JsonPropertyName("longitude")] public double Longitude { get; init; }
-    [JsonPropertyName("altitude_km")] public double AltitudeKm { get; init; }
-}
-
-public sealed record MissionSimulateResponse
-{
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-    [JsonPropertyName("trajectory")] public IReadOnlyList<TrajectoryPointDto> Trajectory { get; init; } = Array.Empty<TrajectoryPointDto>();
-    [JsonPropertyName("obstacles")] public IReadOnlyList<ConjunctionDto> Obstacles { get; init; } = Array.Empty<ConjunctionDto>();
-    [JsonPropertyName("mission_score")] public int MissionScore { get; init; }
-    [JsonPropertyName("risk_score")] public double RiskScore { get; init; }
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-}
-```
-
-### Task 2.9 — Build + commit
-
-```bash
+```powershell
 dotnet build MissionClear.Api/MissionClear.Api.csproj
-git add MissionClear.Api/Models/Dtos/Common MissionClear.Api/Models/Dtos/Orbital MissionClear.Api/Models/Dtos/Mission
-git commit -m "feat(dtos): common envelopes, orbital DTOs, MissionSimulate request/response"
+git add MissionClear.Api/Dtos/Orbital/ MissionClear.Api/Dtos/Common/ MissionClear.Api/Dtos/Status/ MissionClear.Api/Dtos/Destination/ MissionClear.Api/Dtos/User/
+git commit -m "feat(dtos): orbital, common envelopes, status, destination, user DTOs"
 ```
 
 ---
 
-## Phase 3 — Session, Auth, User DTOs
+## Phase 6 — DTOs de Missão
 
-### Task 3.1 — `Models/Dtos/Mission/SessionDtos.cs`
-
-```csharp
-using System.Text.Json.Serialization;
-
-namespace MissionClear.Api.Models.Dtos.Mission;
-
-public sealed record SessionRequest
-{
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-}
-
-public sealed record SessionResponse
-{
-    [JsonPropertyName("session_id")] public string SessionId { get; init; } = string.Empty;
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-    [JsonPropertyName("stream_url")] public string StreamUrl { get; init; } = string.Empty;
-    [JsonPropertyName("expires_at")] public DateTime ExpiresAt { get; init; }
-}
-
-public sealed record SessionCompleteRequest
-{
-    [JsonPropertyName("status")] public string Status { get; init; } = "success";
-    [JsonPropertyName("save_to_history")] public bool SaveToHistory { get; init; } = true;
-}
-
-public sealed record SessionCompleteResponse
-{
-    [JsonPropertyName("session_id")] public string SessionId { get; init; } = string.Empty;
-    [JsonPropertyName("status")] public string Status { get; init; } = "success";
-    [JsonPropertyName("mission_score")] public int MissionScore { get; init; }
-    [JsonPropertyName("risk_score")] public double RiskScore { get; init; }
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-    [JsonPropertyName("obstacles_encountered")] public int ObstaclesEncountered { get; init; }
-    [JsonPropertyName("duration_seconds")] public double DurationSeconds { get; init; }
-    [JsonPropertyName("saved_to_history")] public bool SavedToHistory { get; init; }
-    [JsonPropertyName("mission_id")] public string? MissionId { get; init; }
-}
+**Directories:**
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Mission
 ```
 
-### Task 3.2 — `Models/Dtos/Auth/AuthDtos.cs`
+### Task 6.1 — `Dtos/Mission/SimulateRequest.cs`
+
+> `POST /api/mission/simulate` (section 9).
 
 ```csharp
-using System.Text.Json.Serialization;
+using System.ComponentModel.DataAnnotations;
 
-namespace MissionClear.Api.Models.Dtos.Auth;
+namespace MissionClear.Api.Dtos.Mission;
 
-public sealed record AuthRegisterRequest
-{
-    [JsonPropertyName("email")] public string Email { get; init; } = string.Empty;
-    [JsonPropertyName("password")] public string Password { get; init; } = string.Empty;
-    [JsonPropertyName("display_name")] public string DisplayName { get; init; } = string.Empty;
-}
-
-public sealed record AuthLoginRequest
-{
-    [JsonPropertyName("email")] public string Email { get; init; } = string.Empty;
-    [JsonPropertyName("password")] public string Password { get; init; } = string.Empty;
-}
-
-public sealed record AuthRefreshRequest
-{
-    [JsonPropertyName("refresh_token")] public string RefreshToken { get; init; } = string.Empty;
-}
-
-public sealed record AuthUserSummaryDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("email")] public string Email { get; init; } = string.Empty;
-    [JsonPropertyName("display_name")] public string DisplayName { get; init; } = string.Empty;
-    [JsonPropertyName("created_at")] public DateTime CreatedAt { get; init; }
-    [JsonPropertyName("total_missions")] public int TotalMissions { get; init; }
-    [JsonPropertyName("best_score")] public int BestScore { get; init; }
-}
-
-public sealed record AuthResponse
-{
-    [JsonPropertyName("user")] public AuthUserSummaryDto User { get; init; } = new();
-    [JsonPropertyName("access_token")] public string AccessToken { get; init; } = string.Empty;
-    [JsonPropertyName("refresh_token")] public string RefreshToken { get; init; } = string.Empty;
-    [JsonPropertyName("expires_in")] public int ExpiresIn { get; init; }
-}
-
-public sealed record ChangePasswordRequest
-{
-    [JsonPropertyName("current_password")] public string CurrentPassword { get; init; } = string.Empty;
-    [JsonPropertyName("new_password")] public string NewPassword { get; init; } = string.Empty;
-}
+public sealed record SimulateRequest(
+    [Required] string Destination,
+    DateTime DepartureUtc,
+    DateTime ArrivalUtc);
 ```
 
-### Task 3.3 — `Models/Dtos/User/UserDtos.cs`
+### Task 6.2 — `Dtos/Mission/SimulateResponse.cs`
+
+> Shape de `POST /api/mission/simulate` response (section 9).
+> `trajectory` é array vazio no MVP. `obstacles` usa `ObstacleDto` (idêntico a `ConjunctionDto`).
 
 ```csharp
-using System.Text.Json.Serialization;
+using MissionClear.Api.Dtos.Common;
 
-namespace MissionClear.Api.Models.Dtos.User;
+namespace MissionClear.Api.Dtos.Mission;
 
-public sealed record UserStatsDto
-{
-    [JsonPropertyName("total_missions")] public int TotalMissions { get; init; }
-    [JsonPropertyName("successful_missions")] public int SuccessfulMissions { get; init; }
-    [JsonPropertyName("failed_missions")] public int FailedMissions { get; init; }
-    [JsonPropertyName("aborted_missions")] public int AbortedMissions { get; init; }
-    [JsonPropertyName("success_rate")] public double SuccessRate { get; init; }
-    [JsonPropertyName("best_score")] public int BestScore { get; init; }
-    [JsonPropertyName("average_score")] public double AverageScore { get; init; }
-    [JsonPropertyName("favorite_destination")] public string? FavoriteDestination { get; init; }
-    [JsonPropertyName("total_delta_v_km_s")] public double TotalDeltaVKmS { get; init; }
-}
+/// <summary>
+/// Obstáculo na trajetória — mesmo shape que ConjunctionDto (seção 15 do contrato).
+/// Alias local para clareza semântica no contexto de simulação.
+/// </summary>
+public sealed record ObstacleDto(
+    string DebrisId,
+    string DebrisName,
+    double ClosestApproachKm,
+    string TimeOfClosestApproach,
+    string RiskLevel);
 
-public sealed record UserResponse
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("email")] public string Email { get; init; } = string.Empty;
-    [JsonPropertyName("display_name")] public string DisplayName { get; init; } = string.Empty;
-    [JsonPropertyName("created_at")] public DateTime CreatedAt { get; init; }
-    [JsonPropertyName("stats")] public UserStatsDto Stats { get; init; } = new();
-}
-
-public sealed record UpdateUserRequest
-{
-    [JsonPropertyName("display_name")] public string DisplayName { get; init; } = string.Empty;
-}
+public sealed record SimulateResponse(
+    string SessionId,
+    string Destination,
+    DateTime DepartureUtc,
+    DateTime ArrivalUtc,
+    IReadOnlyList<object> Trajectory,
+    IReadOnlyList<ObstacleDto> Obstacles,
+    int MissionScore,
+    double RiskScore);
 ```
 
-### Task 3.4 — Build + commit
+### Task 6.3 — `Dtos/Mission/SessionRequest.cs`
 
-```bash
+> `POST /api/mission/session` request (section 9).
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+namespace MissionClear.Api.Dtos.Mission;
+
+public sealed record SessionRequest(
+    [Required] string Destination,
+    [Required] string DepartureTime,
+    [Required] string ArrivalTime);
+```
+
+### Task 6.4 — `Dtos/Mission/SessionResponse.cs`
+
+> `POST /api/mission/session` response 201 (section 9).
+
+```csharp
+namespace MissionClear.Api.Dtos.Mission;
+
+public sealed record SessionResponse(
+    string SessionId,
+    string Destination,
+    string DepartureTime,
+    string ArrivalTime,
+    string StreamUrl,
+    string ExpiresAt);
+```
+
+### Task 6.5 — `Dtos/Mission/CompleteSessionRequest.cs`
+
+> `POST /api/mission/session/{sessionId}/complete` request (section 9).
+
+```csharp
+using System.ComponentModel.DataAnnotations;
+
+namespace MissionClear.Api.Dtos.Mission;
+
+public sealed record CompleteSessionRequest(
+    [Required] string Status,
+    bool SaveToHistory = false);
+```
+
+### Task 6.6 — `Dtos/Mission/CompleteSessionResponse.cs`
+
+> `POST /api/mission/session/{sessionId}/complete` response 200 (section 9).
+> `duration_seconds` é `double` (valor no contrato: `"duration_seconds": 22380`).
+> `mission_id` usa prefixo `msn_` — null quando `save_to_history = false`.
+
+```csharp
+namespace MissionClear.Api.Dtos.Mission;
+
+public sealed record CompleteSessionResponse(
+    string SessionId,
+    string Status,
+    int MissionScore,
+    double RiskScore,
+    double DeltaVKmS,
+    int ObstaclesEncountered,
+    double DurationSeconds,
+    bool SavedToHistory,
+    string? MissionId);
+```
+
+### Task 6.7 — Build check + commit
+
+```powershell
 dotnet build MissionClear.Api/MissionClear.Api.csproj
-git add MissionClear.Api/Models/Dtos/Mission MissionClear.Api/Models/Dtos/Auth MissionClear.Api/Models/Dtos/User
-git commit -m "feat(dtos): session lifecycle, auth (register/login/refresh/change-password), user response + stats"
+git add MissionClear.Api/Dtos/Mission/
+git commit -m "feat(dtos): mission DTOs (SimulateRequest/Response, Session lifecycle, CompleteSession)"
 ```
 
 ---
 
-## Phase 4 — History + Dashboard DTOs
+## Phase 7 — DTOs de Histórico e Dashboard
 
-### Task 4.1 — `Models/Dtos/History/MissionHistoryDtos.cs`
-
-```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Dtos.Orbital;
-
-namespace MissionClear.Api.Models.Dtos.History;
-
-public sealed record MissionHistoryDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("destination_display")] public string DestinationDisplay { get; init; } = string.Empty;
-    [JsonPropertyName("status")] public string Status { get; init; } = "success";
-    [JsonPropertyName("mission_score")] public int MissionScore { get; init; }
-    [JsonPropertyName("risk_score")] public double RiskScore { get; init; }
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-    [JsonPropertyName("obstacles_encountered")] public int ObstaclesEncountered { get; init; }
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-    [JsonPropertyName("created_at")] public DateTime CreatedAt { get; init; }
-}
-
-public sealed record ScoreBreakdownDto
-{
-    [JsonPropertyName("efficiency_score")] public int EfficiencyScore { get; init; }
-    [JsonPropertyName("safety_score")] public int SafetyScore { get; init; }
-    [JsonPropertyName("total")] public int Total { get; init; }
-}
-
-public sealed record MissionDetailDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("destination")] public string Destination { get; init; } = string.Empty;
-    [JsonPropertyName("destination_display")] public string DestinationDisplay { get; init; } = string.Empty;
-    [JsonPropertyName("status")] public string Status { get; init; } = "success";
-    [JsonPropertyName("mission_score")] public int MissionScore { get; init; }
-    [JsonPropertyName("risk_score")] public double RiskScore { get; init; }
-    [JsonPropertyName("delta_v_km_s")] public double DeltaVKmS { get; init; }
-    [JsonPropertyName("obstacles_encountered")] public int ObstaclesEncountered { get; init; }
-    [JsonPropertyName("departure_time")] public DateTime DepartureTime { get; init; }
-    [JsonPropertyName("arrival_time")] public DateTime ArrivalTime { get; init; }
-    [JsonPropertyName("created_at")] public DateTime CreatedAt { get; init; }
-    [JsonPropertyName("obstacles")] public IReadOnlyList<ConjunctionDto> Obstacles { get; init; } = Array.Empty<ConjunctionDto>();
-    [JsonPropertyName("score_breakdown")] public ScoreBreakdownDto ScoreBreakdown { get; init; } = new();
-}
-
-public sealed record MissionsByDestinationDto
-{
-    [JsonPropertyName("ISS")] public int Iss { get; init; }
-    [JsonPropertyName("LEO_GENERIC")] public int LeoGeneric { get; init; }
-    [JsonPropertyName("SSO")] public int Sso { get; init; }
-}
-
-public sealed record MissionStatsDto
-{
-    [JsonPropertyName("total_missions")] public int TotalMissions { get; init; }
-    [JsonPropertyName("successful_missions")] public int SuccessfulMissions { get; init; }
-    [JsonPropertyName("failed_missions")] public int FailedMissions { get; init; }
-    [JsonPropertyName("aborted_missions")] public int AbortedMissions { get; init; }
-    [JsonPropertyName("success_rate")] public double SuccessRate { get; init; }
-    [JsonPropertyName("best_score")] public int BestScore { get; init; }
-    [JsonPropertyName("worst_score")] public int WorstScore { get; init; }
-    [JsonPropertyName("average_score")] public double AverageScore { get; init; }
-    [JsonPropertyName("total_delta_v_km_s")] public double TotalDeltaVKmS { get; init; }
-    [JsonPropertyName("total_obstacles_encountered")] public int TotalObstaclesEncountered { get; init; }
-    [JsonPropertyName("favorite_destination")] public string? FavoriteDestination { get; init; }
-    [JsonPropertyName("missions_by_destination")] public MissionsByDestinationDto MissionsByDestination { get; init; } = new();
-}
+**Directories:**
+```powershell
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/History
+New-Item -ItemType Directory -Force MissionClear.Api/Dtos/Dashboard
 ```
 
-### Task 4.2 — `Models/Dtos/Dashboard/DashboardDtos.cs`
+### Task 7.1 — `Dtos/History/MissionSummaryDto.cs`
+
+> Shape de cada item em `GET /api/missions` data array (section 10).
 
 ```csharp
-using System.Text.Json.Serialization;
-using MissionClear.Api.Models.Dtos.User;
+namespace MissionClear.Api.Dtos.History;
 
-namespace MissionClear.Api.Models.Dtos.Dashboard;
-
-public sealed record ByTypeDto
-{
-    [JsonPropertyName("debris")] public int Debris { get; init; }
-    [JsonPropertyName("satellite")] public int Satellite { get; init; }
-    [JsonPropertyName("rocket_body")] public int RocketBody { get; init; }
-}
-
-public sealed record ByAltitudeBandDto
-{
-    [JsonPropertyName("low_200_500km")] public int Low200To500Km { get; init; }
-    [JsonPropertyName("mid_500_1000km")] public int Mid500To1000Km { get; init; }
-    [JsonPropertyName("high_1000_2000km")] public int High1000To2000Km { get; init; }
-}
-
-public sealed record OrbitalSummaryDto
-{
-    [JsonPropertyName("total_tracked_objects")] public int TotalTrackedObjects { get; init; }
-    [JsonPropertyName("by_type")] public ByTypeDto ByType { get; init; } = new();
-    [JsonPropertyName("by_altitude_band")] public ByAltitudeBandDto ByAltitudeBand { get; init; } = new();
-    [JsonPropertyName("active_conjunction_alerts")] public int ActiveConjunctionAlerts { get; init; }
-    [JsonPropertyName("last_updated")] public DateTime LastUpdated { get; init; }
-}
-
-public sealed record DashboardSummaryResponse
-{
-    [JsonPropertyName("orbital")] public OrbitalSummaryDto Orbital { get; init; } = new();
-    [JsonPropertyName("user")] public UserResponse? User { get; init; }
-}
-
-public sealed record DashboardAlertDto
-{
-    [JsonPropertyName("id")] public string Id { get; init; } = string.Empty;
-    [JsonPropertyName("debris_id")] public string DebrisId { get; init; } = string.Empty;
-    [JsonPropertyName("debris_name")] public string DebrisName { get; init; } = string.Empty;
-    [JsonPropertyName("affected_destination")] public string AffectedDestination { get; init; } = string.Empty;
-    [JsonPropertyName("closest_approach_km")] public double ClosestApproachKm { get; init; }
-    [JsonPropertyName("time_of_closest_approach")] public DateTime TimeOfClosestApproach { get; init; }
-    [JsonPropertyName("risk_level")] public string RiskLevel { get; init; } = "low";
-    [JsonPropertyName("minutes_until_conjunction")] public double MinutesUntilConjunction { get; init; }
-    [JsonPropertyName("detected_at")] public DateTime DetectedAt { get; init; }
-}
-
-public sealed record DashboardAlertsResponse
-{
-    [JsonPropertyName("alerts")] public IReadOnlyList<DashboardAlertDto> Alerts { get; init; } = Array.Empty<DashboardAlertDto>();
-    [JsonPropertyName("window_hours")] public int WindowHours { get; init; }
-    [JsonPropertyName("generated_at")] public DateTime GeneratedAt { get; init; }
-}
+public sealed record MissionSummaryDto(
+    string Id,
+    string Destination,
+    string DestinationDisplay,
+    string Status,
+    int MissionScore,
+    double RiskScore,
+    double DeltaVKmS,
+    int ObstaclesEncountered,
+    string DepartureTime,
+    string ArrivalTime,
+    string CreatedAt);
 ```
 
-### Task 4.3 — Build + commit
+### Task 7.2 — `Dtos/History/MissionDetailResponse.cs`
 
-```bash
-git add MissionClear.Api/Models/Dtos/History MissionClear.Api/Models/Dtos/Dashboard
-git commit -m "feat(dtos): mission history (list/detail/stats) and dashboard (summary/alerts)"
+> Shape de `GET /api/missions/{id}` (section 10).
+
+```csharp
+using MissionClear.Api.Dtos.Mission;
+
+namespace MissionClear.Api.Dtos.History;
+
+public sealed record ScoreBreakdownDto(
+    int EfficiencyScore,
+    int SafetyScore,
+    int Total);
+
+public sealed record MissionDetailResponse(
+    string Id,
+    string Destination,
+    string DestinationDisplay,
+    string Status,
+    int MissionScore,
+    double RiskScore,
+    double DeltaVKmS,
+    string DepartureTime,
+    string ArrivalTime,
+    string CreatedAt,
+    IReadOnlyList<ObstacleDto> Obstacles,
+    ScoreBreakdownDto ScoreBreakdown);
+```
+
+### Task 7.3 — `Dtos/History/MissionStatsResponse.cs`
+
+> Shape de `GET /api/missions/stats` (section 10).
+> `average_score` é `int` no contrato (`"average_score": 81`).
+> `missions_by_destination` é objeto com chaves ISS/LEO_GENERIC/SSO — usar `Dictionary<string, int>`.
+
+```csharp
+namespace MissionClear.Api.Dtos.History;
+
+public sealed record MissionStatsResponse(
+    int TotalMissions,
+    int SuccessfulMissions,
+    int FailedMissions,
+    int AbortedMissions,
+    double SuccessRate,
+    int BestScore,
+    int WorstScore,
+    int AverageScore,
+    double TotalDeltaVKmS,
+    int TotalObstaclesEncountered,
+    string? FavoriteDestination,
+    Dictionary<string, int> MissionsByDestination);
+```
+
+### Task 7.4 — `Dtos/Dashboard/DashboardSummaryResponse.cs`
+
+> Shape de `GET /api/dashboard/summary` (section 11).
+> `user` é null quando não autenticado.
+> `ByAltitudeBandDto` aqui reutiliza a definição de `Dtos/Orbital/DebrisStatsDto.cs`
+> **mas** precisa dos mesmos `[JsonPropertyName]` explícitos para as chaves com números.
+
+```csharp
+using MissionClear.Api.Dtos.Orbital;
+
+namespace MissionClear.Api.Dtos.Dashboard;
+
+public sealed record OrbitalSummaryDto(
+    int TotalTrackedObjects,
+    ByTypeDto ByType,
+    ByAltitudeBandDto ByAltitudeBand,
+    int ActiveConjunctionAlerts,
+    string LastUpdated);
+
+public sealed record LastMissionDto(
+    string Destination,
+    string Status,
+    int Score,
+    string CreatedAt);
+
+public sealed record UserDashboardDto(
+    string DisplayName,
+    int TotalMissions,
+    int BestScore,
+    LastMissionDto? LastMission);
+
+public sealed record DashboardSummaryResponse(
+    OrbitalSummaryDto Orbital,
+    UserDashboardDto? User);
+```
+
+### Task 7.5 — `Dtos/Dashboard/AlertsResponse.cs`
+
+> Shape de `GET /api/dashboard/alerts` (section 11).
+> `minutes_until_conjunction` é `int` no contrato (`"minutes_until_conjunction": 238`).
+
+```csharp
+namespace MissionClear.Api.Dtos.Dashboard;
+
+public sealed record AlertDto(
+    string Id,
+    string DebrisId,
+    string DebrisName,
+    string AffectedDestination,
+    double ClosestApproachKm,
+    string TimeOfClosestApproach,
+    string RiskLevel,
+    int MinutesUntilConjunction,
+    string DetectedAt);
+
+public sealed record AlertsResponse(
+    IReadOnlyList<AlertDto> Alerts,
+    int WindowHours,
+    string GeneratedAt);
+```
+
+### Task 7.6 — Build check + commit
+
+```powershell
+dotnet build MissionClear.Api/MissionClear.Api.csproj
+git add MissionClear.Api/Dtos/History/ MissionClear.Api/Dtos/Dashboard/
+git commit -m "feat(dtos): history (MissionSummary, MissionDetail, MissionStats) and dashboard (Summary, Alerts)"
 ```
 
 ---
 
-## Phase 5 — Compile-check tests
+## Phase 8 — JSON Naming Policy em Program.cs
 
-### Task 5.1 — `MissionClear.Tests/Models/DtoSerializationTests.cs`
+> Garantir que `JsonNamingPolicy.SnakeCaseLower` está configurado para todos os controllers.
+> Localizar a seção de `AddControllers` ou `AddControllers().AddJsonOptions(...)` em `Program.cs`.
 
 ```csharp
-using System.Text.Json;
+// Em Program.cs — dentro do builder.Services block:
+builder.Services.AddControllers()
+    .AddJsonOptions(opts =>
+    {
+        opts.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+        opts.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
+        opts.JsonSerializerOptions.WriteIndented = false;
+    });
+```
+
+> Adicionar using: `using System.Text.Json; using System.Text.Json.Serialization;`
+
+> **Atenção:** `ByAltitudeBandDto` tem `[JsonPropertyName]` explícito — esse atributo tem precedência sobre a policy global. Verificar se `JsonNamingPolicy` + `[JsonPropertyName]` coexistem corretamente (coexistem — o atributo ganha).
+
+### Task 8.1 — Build + test final
+
+```powershell
+dotnet build MissionClear.Api/MissionClear.Api.csproj
+dotnet build MissionClear.Tests/MissionClear.Tests.csproj
+dotnet test MissionClear.Tests/MissionClear.Tests.csproj
+git add MissionClear.Api/Program.cs
+git commit -m "feat(config): configure SnakeCaseLower JSON naming policy for all controllers"
+```
+
+---
+
+## Phase 9 — Compile-check Tests
+
+**File:** `MissionClear.Tests/Models/DtoCompileTests.cs`
+
+```csharp
+using MissionClear.Api.Dtos.Auth;
+using MissionClear.Api.Dtos.Common;
+using MissionClear.Api.Dtos.Dashboard;
+using MissionClear.Api.Dtos.Destination;
+using MissionClear.Api.Dtos.History;
+using MissionClear.Api.Dtos.Mission;
+using MissionClear.Api.Dtos.Orbital;
+using MissionClear.Api.Dtos.Status;
+using MissionClear.Api.Dtos.User;
+using MissionClear.Api.Exceptions;
+using MissionClear.Api.Models;
 using FluentAssertions;
-using MissionClear.Api.Models.Domain;
-using MissionClear.Api.Models.Dtos.Auth;
-using MissionClear.Api.Models.Dtos.Common;
-using MissionClear.Api.Models.Dtos.Dashboard;
-using MissionClear.Api.Models.Dtos.History;
-using MissionClear.Api.Models.Dtos.Mission;
-using MissionClear.Api.Models.Dtos.Orbital;
-using MissionClear.Api.Models.Dtos.User;
 using Xunit;
 
 namespace MissionClear.Tests.Models;
 
-public class DtoSerializationTests
+public class DtoCompileTests
 {
-    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+    [Fact]
+    public void DomainException_stores_error_code_and_http_status()
+    {
+        var ex = new DomainException("EMAIL_ALREADY_EXISTS", "Email já cadastrado.", 409);
+        ex.ErrorCode.Should().Be("EMAIL_ALREADY_EXISTS");
+        ex.HttpStatus.Should().Be(409);
+        ex.Message.Should().Be("Email já cadastrado.");
+    }
 
     [Fact]
-    public void DebrisDto_serializes_with_snake_case_fields()
+    public void KnownDestinations_values_match_api_contract_section4()
     {
-        var dto = new DebrisDto
+        KnownDestinations.ISS.Id.Should().Be("ISS");
+        KnownDestinations.ISS.AltitudeKm.Should().Be(408);
+        KnownDestinations.ISS.InclinationDeg.Should().Be(51.6);
+        KnownDestinations.ISS.DeltaVKmS.Should().Be(9.40);
+        KnownDestinations.ISS.MissionDurationHours.Should().Be(6.2);
+
+        KnownDestinations.LeoGeneric.Id.Should().Be("LEO_GENERIC");
+        KnownDestinations.LeoGeneric.AltitudeKm.Should().Be(400);
+        KnownDestinations.LeoGeneric.InclinationDeg.Should().Be(28.5);
+        KnownDestinations.LeoGeneric.DeltaVKmS.Should().Be(9.20);
+        KnownDestinations.LeoGeneric.MissionDurationHours.Should().Be(5.8);
+
+        KnownDestinations.Sso.Id.Should().Be("SSO");
+        KnownDestinations.Sso.AltitudeKm.Should().Be(500);
+        KnownDestinations.Sso.InclinationDeg.Should().Be(97.4);
+        KnownDestinations.Sso.DeltaVKmS.Should().Be(10.10);
+        KnownDestinations.Sso.MissionDurationHours.Should().Be(7.0);
+
+        KnownDestinations.All.Should().HaveCount(3);
+    }
+
+    [Fact]
+    public void KnownDestinations_FindById_is_case_insensitive()
+    {
+        KnownDestinations.FindById("iss").Should().NotBeNull();
+        KnownDestinations.FindById("ISS").Should().NotBeNull();
+        KnownDestinations.FindById("leo_generic").Should().NotBeNull();
+        KnownDestinations.FindById("MARS").Should().BeNull();
+    }
+
+    [Fact]
+    public void MissionSession_has_sess_prefix_and_30min_ttl()
+    {
+        var session = new MissionSession
         {
-            Id = "25544", Name = "ISS (ZARYA)", Type = "satellite",
-            Latitude = -23.5, Longitude = -46.6, AltitudeKm = 408.5,
-            VelocityKmS = 7.66, Source = "celestrak", UpdatedAt = DateTime.UtcNow
+            Destination = "ISS",
+            DepartureTime = DateTime.UtcNow,
+            ArrivalTime = DateTime.UtcNow.AddHours(6),
+            UserId = Guid.NewGuid()
         };
-
-        var json = JsonSerializer.Serialize(dto, Json);
-
-        json.Should().Contain("\"altitude_km\"");
-        json.Should().Contain("\"velocity_km_s\"");
-        json.Should().Contain("\"updated_at\"");
+        session.SessionId.Should().StartWith("sess_");
+        session.ExpiresAt.Should().BeCloseTo(DateTime.UtcNow.AddMinutes(30), TimeSpan.FromSeconds(5));
+        session.IsExpired.Should().BeFalse();
     }
 
     [Fact]
-    public void DebrisDto_From_OrbitalObject_maps_all_fields()
+    public void ApiErrorDto_factory_methods_produce_correct_codes()
     {
-        var obj = new OrbitalObject("1", "Test", "rocket_body", 10, 20, 500, 7.5, "celestrak", DateTime.UtcNow);
-        var dto = DebrisDto.From(obj);
-
-        dto.Id.Should().Be("1");
-        dto.Type.Should().Be("rocket_body");
-        dto.AltitudeKm.Should().Be(500);
+        ApiErrorDto.EmailAlreadyExists().Error.Should().Be("EMAIL_ALREADY_EXISTS");
+        ApiErrorDto.InvalidCredentials().Error.Should().Be("INVALID_CREDENTIALS");
+        ApiErrorDto.TokenExpired().Error.Should().Be("TOKEN_EXPIRED");
+        ApiErrorDto.InvalidRefreshToken().Error.Should().Be("INVALID_REFRESH_TOKEN");
+        ApiErrorDto.Unauthorized().Error.Should().Be("UNAUTHORIZED");
+        ApiErrorDto.Forbidden().Error.Should().Be("FORBIDDEN");
+        ApiErrorDto.DebrisNotFound("X").Error.Should().Be("DEBRIS_NOT_FOUND");
+        ApiErrorDto.MissionNotFound("X").Error.Should().Be("MISSION_NOT_FOUND");
+        ApiErrorDto.SessionNotFound("X").Error.Should().Be("SESSION_NOT_FOUND");
+        ApiErrorDto.SessionAlreadyCompleted().Error.Should().Be("SESSION_ALREADY_COMPLETED");
+        ApiErrorDto.InvalidDestination("X").Error.Should().Be("INVALID_DESTINATION");
+        ApiErrorDto.TimeRangeExceeded().Error.Should().Be("TIME_RANGE_EXCEEDED");
+        ApiErrorDto.InvalidTimeRange().Error.Should().Be("INVALID_TIME_RANGE");
+        ApiErrorDto.MissingParameter("p").Error.Should().Be("MISSING_PARAMETER");
+        ApiErrorDto.InvalidDateFormat("p").Error.Should().Be("INVALID_DATE_FORMAT");
+        ApiErrorDto.InvalidPasswordFormat().Error.Should().Be("INVALID_PASSWORD_FORMAT");
+        ApiErrorDto.InvalidCurrentPassword().Error.Should().Be("INVALID_CURRENT_PASSWORD");
+        ApiErrorDto.CacheNotReady().Error.Should().Be("CACHE_NOT_READY");
+        ApiErrorDto.InternalError().Error.Should().Be("INTERNAL_ERROR");
     }
 
     [Fact]
-    public void RiskLevelClassifier_classifies_distance_thresholds()
+    public void PaginationDto_computes_total_pages()
     {
-        RiskLevelClassifier.Classify(0.5).Should().Be(RiskLevel.Critical);
-        RiskLevelClassifier.Classify(3).Should().Be(RiskLevel.High);
-        RiskLevelClassifier.Classify(7).Should().Be(RiskLevel.Medium);
-        RiskLevelClassifier.Classify(50).Should().Be(RiskLevel.Low);
-    }
-
-    [Fact]
-    public void KnownDestinations_TryGet_is_case_insensitive()
-    {
-        KnownDestinations.TryGet("iss", out var d).Should().BeTrue();
-        d.AltitudeKm.Should().Be(408);
-        d.InclinationDeg.Should().Be(51.6);
-
-        KnownDestinations.TryGet("sso", out var sso).Should().BeTrue();
-        sso.InclinationDeg.Should().Be(97.4);
-
-        KnownDestinations.TryGet("MARS", out _).Should().BeFalse();
-        KnownDestinations.ValidIds.Should().BeEquivalentTo(new[] { "ISS", "LEO_GENERIC", "SSO" });
-    }
-
-    [Fact]
-    public void ApiError_factory_methods_produce_correct_codes()
-    {
-        ApiErrorDto.InvalidDestination("X").Error.Should().Be("invalid_destination");
-        ApiErrorDto.CacheNotReady().Error.Should().Be("cache_not_ready");
-        ApiErrorDto.InvalidCredentials().Error.Should().Be("invalid_credentials");
-        ApiErrorDto.EmailExists().Error.Should().Be("email_exists");
-        ApiErrorDto.TokenExpired().Error.Should().Be("token_expired");
-        ApiErrorDto.InvalidRefreshToken().Error.Should().Be("invalid_refresh_token");
-        ApiErrorDto.Forbidden().Error.Should().Be("forbidden");
-        ApiErrorDto.NotFound("Mission").Error.Should().Be("not_found");
-        ApiErrorDto.InternalError().Error.Should().Be("internal_error");
-        ApiErrorDto.SessionCompleted().Error.Should().Be("session_completed");
-        ApiErrorDto.InvalidPasswordFormat().Error.Should().Be("invalid_password_format");
-        ApiErrorDto.InvalidCurrentPassword().Error.Should().Be("invalid_current_password");
-        ApiErrorDto.TimeRangeExceeded().Error.Should().Be("time_range_exceeded");
-        ApiErrorDto.InvalidTimeRange().Error.Should().Be("invalid_time_range");
-    }
-
-    [Fact]
-    public void Pagination_From_computes_total_pages()
-    {
-        var p = PaginationDto.From(page: 1, limit: 20, total: 45);
+        var p = PaginationDto.From(1, 20, 45);
         p.TotalPages.Should().Be(3);
+        p.Total.Should().Be(45);
     }
 
     [Fact]
-    public void MissionSession_NewId_has_sess_prefix()
+    public void All_dto_types_instantiate_without_error()
     {
-        MissionSession.NewId().Should().StartWith("sess_");
+        // Auth
+        _ = new RegisterRequest("a@b.com", "Pass1234!", "Name");
+        _ = new LoginRequest("a@b.com", "pass");
+        _ = new RefreshRequest("tok");
+        _ = new LogoutRequest("tok");
+        _ = new UserInAuthResponse("usr_1", "e", "n", "Researcher", DateTime.UtcNow.ToString("O"));
+        _ = new AuthResponse(new UserInAuthResponse("usr_1", "e", "n", "Researcher", "2025-01-01T00:00:00Z"), "at", "rt", 3600);
+        _ = new RefreshTokenResponse("at", 3600);
+
+        // User
+        _ = new UserStatsDto(0, 0, 0, 0, 0, 0, 0, null, 0);
+        _ = new UserProfileResponse("usr_1", "e", "n", "Researcher", "2025-01-01T00:00:00Z", new UserStatsDto(0,0,0,0,0,0,0,null,0));
+        _ = new UpdateUserRequest(null, null, null);
+
+        // Orbital
+        _ = new DebrisDto("1","n","debris",0,0,400,7.5,"celestrak","2025-01-01T00:00:00Z");
+        _ = new TleDto("ep", "l1", "l2");
+        _ = new OrbitParamsDto(74, 0.004, 97, 800, 750);
+        _ = new DebrisDetailDto("1","n","debris",0,0,400,7.5,"celestrak","2025-01-01T00:00:00Z", null, null);
+        _ = new ByTypeDto(100, 50, 20);
+        _ = new ByAltitudeBandDto(80, 60, 40);
+        _ = new SourcesDto(200, 0);
+        _ = new DebrisStatsDto(200, new ByTypeDto(0,0,0), new ByAltitudeBandDto(0,0,0), new SourcesDto(0,0), "2025-01-01T00:00:00Z");
+
+        // Common
+        _ = new ConjunctionDto("1","n",5.0,"2025-01-01T00:00:00Z","high");
+        _ = new LaunchWindowDto("s","e",0.01,9.4,6.2,true,[]);
+        _ = new LaunchWindowsResponse("ISS","s","e",48,41,[]);
+        _ = new BestWindowDto(1,"s","e",0.01,9.4,6.2,[]);
+        _ = new BestWindowsResponse("ISS","s","e",[]);
+
+        // Status
+        _ = new SourceStatusDto("ok","unavailable");
+        _ = new StatusResponse("ready",100,90,null,null,0,new SourceStatusDto("ok","unavailable"));
+
+        // Destination
+        _ = new DestinationDto("ISS","ISS",408,51.6,"desc",9.4,6.2,"iss");
+        _ = new DestinationsResponse([]);
+
+        // Mission
+        _ = new SimulateRequest("ISS", DateTime.UtcNow, DateTime.UtcNow.AddHours(6));
+        _ = new ObstacleDto("1","n",5.0,"2025-01-01T00:00:00Z","high");
+        _ = new SimulateResponse("sess_1","ISS",DateTime.UtcNow,DateTime.UtcNow.AddHours(6),[],[],87,0.12);
+        _ = new SessionRequest("ISS","s","e");
+        _ = new SessionResponse("sess_1","ISS","s","e","/stream","exp");
+        _ = new CompleteSessionRequest("success", false);
+        _ = new CompleteSessionResponse("sess_1","success",87,0.12,9.4,2,3600.0,false,null);
+
+        // History
+        _ = new MissionSummaryDto("msn_1","ISS","ISS","success",87,0.12,9.4,2,"s","e","c");
+        _ = new ScoreBreakdownDto(42,45,87);
+        _ = new MissionDetailResponse("msn_1","ISS","ISS","success",87,0.12,9.4,"s","e","c",[],new ScoreBreakdownDto(42,45,87));
+        _ = new MissionStatsResponse(12,9,2,1,0.75,97,23,81,112.8,18,"ISS",new Dictionary<string,int>{{"ISS",8}});
+
+        // Dashboard
+        _ = new LastMissionDto("ISS","success",87,"2025-01-01T00:00:00Z");
+        _ = new UserDashboardDto("Name",12,97,null);
+        _ = new OrbitalSummaryDto(1000,new ByTypeDto(0,0,0),new ByAltitudeBandDto(0,0,0),3,"2025-01-01T00:00:00Z");
+        _ = new DashboardSummaryResponse(new OrbitalSummaryDto(0,new ByTypeDto(0,0,0),new ByAltitudeBandDto(0,0,0),0,"2025-01-01T00:00:00Z"),null);
+        _ = new AlertDto("alrt_1","1","n","ISS",8.2,"2025-01-01T00:00:00Z","critical",238,"2025-01-01T00:00:00Z");
+        _ = new AlertsResponse([],6,"2025-01-01T00:00:00Z");
     }
 
     [Fact]
-    public void All_response_dtos_instantiate_with_defaults()
+    public void RegisterRequest_default_role_is_Researcher()
     {
-        _ = new AuthResponse();
-        _ = new UserResponse();
-        _ = new MissionStatsDto();
-        _ = new MissionHistoryDto();
-        _ = new MissionDetailDto();
-        _ = new DashboardSummaryResponse();
-        _ = new DashboardAlertsResponse();
-        _ = new LaunchWindowsResponse();
-        _ = new MissionSimulateResponse();
-        _ = new SessionResponse();
-        _ = new SessionCompleteResponse();
-        _ = new StatusResponse();
+        var req = new RegisterRequest("a@b.com", "Pass1234!", "Name");
+        req.Role.Should().Be("Researcher");
     }
 
     [Fact]
-    public void SessionCompleteRequest_status_parses_known_values()
+    public void OrbitalObject_optional_tle_fields_are_null_by_default()
     {
-        SessionStatusExtensions.TryParse("success", out var s).Should().BeTrue();
-        s.Should().Be(SessionStatus.Success);
-        SessionStatusExtensions.TryParse("failure", out s).Should().BeTrue();
-        s.Should().Be(SessionStatus.Failure);
-        SessionStatusExtensions.TryParse("aborted", out s).Should().BeTrue();
-        s.Should().Be(SessionStatus.Aborted);
-        SessionStatusExtensions.TryParse("nonsense", out _).Should().BeFalse();
+        var obj = new OrbitalObject("1","ISS","satellite",0,0,408,7.66,"celestrak",DateTime.UtcNow);
+        obj.TleLine1.Should().BeNull();
+        obj.InclinationDeg.Should().BeNull();
     }
 }
 ```
 
-### Task 5.2 — Run tests + commit
+### Task 9.1 — Run + commit
 
-```bash
-dotnet test MissionClear.Tests
-git add MissionClear.Tests/Models/DtoSerializationTests.cs
-git commit -m "test(models): compile-check + snake_case + factory invariants for domain and DTOs"
+```powershell
+dotnet build MissionClear.Api/MissionClear.Api.csproj
+dotnet test MissionClear.Tests/MissionClear.Tests.csproj
+git add MissionClear.Tests/Models/DtoCompileTests.cs
+git commit -m "test(models): compile-check all DTOs, DomainException, KnownDestinations invariants"
 ```
 
 ---
 
 ## Definition of Done
 
-- [ ] `dotnet build` no `MissionClear.Api` compila sem warnings
-- [ ] `dotnet test` passa todos os testes em `DtoSerializationTests`
-- [ ] Todos os domain records criados em `Models/Domain/` + `Models/Tle/`
-- [ ] Todos os DTOs criados em `Models/Dtos/{Common,Orbital,Mission,Auth,User,History,Dashboard}/`
-- [ ] `KnownDestinations` expõe ISS (408 km, 51.6°), LEO_GENERIC (400 km, 28.5°), SSO (500 km, 97.4°)
-- [ ] `RiskLevelClassifier.Classify` retorna Critical (<1), High (<5), Medium (<10), Low (resto)
-- [ ] `ApiErrorDto` expõe todos os 14 factory methods
-- [ ] Toda propriedade JSON usa `[JsonPropertyName("snake_case")]`
-- [ ] Nenhum arquivo passa de 200 linhas
+- [ ] `MissionClear.Api/Exceptions/DomainException.cs` existe com `ErrorCode` (string) e `HttpStatus` (int)
+- [ ] `DomainException` cobre todos os 19 error codes de `API_CONTRACT.md` section 14
+- [ ] `Models/OrbitalObject.cs` — record com campos TLE/orbit opcionais
+- [ ] `Models/MissionDestination.cs` + `KnownDestinations` — ISS (408km, 51.6°, Δv 9.40, 6.2h), LEO_GENERIC (400km, 28.5°, Δv 9.20, 5.8h), SSO (500km, 97.4°, Δv 10.10, 7.0h)
+- [ ] `Models/ConjunctionResult.cs`, `Models/LaunchWindow.cs`, `Models/MissionSession.cs`
+- [ ] `MissionSession.IsExpired` property e TTL padrão de 30 minutos
+- [ ] `Dtos/Auth/`: RegisterRequest (Role default "Researcher"), LoginRequest, RefreshRequest, LogoutRequest, AuthResponse, UserInAuthResponse (com `Role`), RefreshTokenResponse
+- [ ] `Dtos/User/`: UserProfileResponse (com `Role`), UserStatsDto, UpdateUserRequest
+- [ ] `Dtos/Orbital/`: DebrisDto, DebrisDetailDto (TleDto + OrbitParamsDto), DebrisStatsDto (ByTypeDto, ByAltitudeBandDto com [JsonPropertyName] explícito, SourcesDto)
+- [ ] `Dtos/Mission/`: SimulateRequest, SimulateResponse (ObstacleDto), SessionRequest, SessionResponse, CompleteSessionRequest, CompleteSessionResponse
+- [ ] `Dtos/History/`: MissionSummaryDto, MissionDetailResponse (ScoreBreakdownDto), MissionStatsResponse
+- [ ] `Dtos/Dashboard/`: DashboardSummaryResponse (OrbitalSummaryDto, UserDashboardDto, LastMissionDto), AlertsResponse (AlertDto)
+- [ ] `Dtos/Common/`: ApiErrorDto (19 factory methods), PaginationDto, PagedResponse\<T\>, ConjunctionDto, LaunchWindowDto, LaunchWindowsResponse (total_windows + safe_windows), BestWindowDto, BestWindowsResponse
+- [ ] `Dtos/Status/`: StatusResponse, SourceStatusDto
+- [ ] `Dtos/Destination/`: DestinationDto, DestinationsResponse
+- [ ] `Program.cs` configura `JsonNamingPolicy.SnakeCaseLower` + `WhenWritingNull`
+- [ ] `dotnet build` limpo em `MissionClear.Api` e `MissionClear.Tests`
+- [ ] `dotnet test` passa `DtoCompileTests` (todos os facts verdes)
 
 ## Handoff para os próximos planos
 
-- **plan-03-orbital** consome `OrbitalObject`, `TleRecord`, `CelesTrakGpRecord`, `LaunchWindow`, `ConjunctionResult`
-- **plan-04-auth** consome `AuthRegisterRequest`, `AuthLoginRequest`, `AuthResponse`, `ApiErrorDto.*`
-- **plan-05-mission** consome `MissionSession`, `SessionRequest/Response`, `SessionCompleteRequest/Response`
-- **plan-06-history-dashboard** consome `MissionHistoryDto`, `MissionDetailDto`, `MissionStatsDto`, `DashboardSummaryResponse`, `DashboardAlertsResponse`
-- **plan-07-controllers** consome todos os DTOs + `ApiErrorDto` factory methods
+| Plano | Tipos consumidos |
+|---|---|
+| **phase-03-orbital** | `OrbitalObject`, `MissionDestination`, `KnownDestinations`, `LaunchWindow`, `ConjunctionResult`, `DomainException` |
+| **phase-04-auth** | `RegisterRequest`, `LoginRequest`, `AuthResponse`, `UserInAuthResponse`, `DomainException`, `ApiErrorDto.*` |
+| **phase-05-simulation** | `MissionSession`, `SessionRequest`, `SessionResponse`, `CompleteSessionRequest`, `CompleteSessionResponse`, `SimulateRequest`, `SimulateResponse` |
+| **phase-06-history-dashboard** | `MissionSummaryDto`, `MissionDetailResponse`, `MissionStatsResponse`, `DashboardSummaryResponse`, `AlertsResponse` |
+| **phase-07-api-controllers** | Todos os DTOs + `ApiErrorDto` factory methods + `DomainException` (via middleware) |
+| **phase-08-mvc-web** | `AuthResponse`, `UserInAuthResponse`, `UserProfileResponse` |

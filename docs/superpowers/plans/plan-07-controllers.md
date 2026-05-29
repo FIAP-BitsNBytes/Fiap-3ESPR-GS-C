@@ -1,829 +1,1011 @@
-# Implementation Plan 07: Controllers & API Endpoints
+# Implementation Plan 07 — API Controllers + Authorization + Program.cs
 
-## Overview
+> **Fonte da verdade.** Substitui toda versão anterior deste plano.
+> **Para workers agenticos:** sub-skill obrigatória: `superpowers:executing-plans`
 
-Final plan in the Mission Clear backend series. Wires all 23 REST endpoints across 9 controllers, integrating every service built in plans 00-06. Controllers act as thin HTTP adapters: validate input shape, call a service, map the result. Zero business logic. Includes global exception middleware, base controller helpers, and integration tests using `WebApplicationFactory` with InMemory database.
+**Goal:** Implementar os 9 controllers com autorização por Role, Program.cs final com DI completo (Aspire), GlobalExceptionMiddleware atualizado e testes de integração com WebApplicationFactory + InMemory DB.
 
-## Requirements
-
-- All 23 routes from `docs/API_CONTRACT.md` implemented exactly as specified
-- Zero business logic in controllers (anti-pattern from CLAUDE.md)
-- Unified error envelope via `ApiErrorDto`
-- Centralized domain exception mapping via `BaseApiController.DomainError(...)`
-- Global exception middleware as last-resort handler (no stack traces in production)
-- `[Authorize]` enforced on protected routes; optional auth on dual-mode routes
-- Integration tests using `WebApplicationFactory<Program>` with InMemory DB
-- Route order: `/missions/stats` declared BEFORE `/missions/{id}`
-
-## Architecture Changes
-
-```
-MissionClear.Api/
-├── Controllers/
-│   ├── BaseApiController.cs          (NEW — helpers)
-│   ├── AuthController.cs             (NEW)
-│   ├── UsersController.cs            (NEW)
-│   ├── StatusController.cs           (NEW)
-│   ├── DebrisController.cs           (NEW)
-│   ├── DestinationsController.cs     (NEW)
-│   ├── LaunchWindowsController.cs    (NEW)
-│   ├── MissionController.cs          (NEW)
-│   ├── MissionsController.cs         (NEW — history)
-│   └── DashboardController.cs        (NEW)
-├── Middleware/
-│   └── GlobalExceptionMiddleware.cs  (NEW)
-└── Program.cs                        (UPDATE — middleware + CORS)
-
-MissionClear.Tests/
-└── Controllers/
-    ├── TestWebApplicationFactory.cs  (NEW)
-    ├── AuthControllerTests.cs        (NEW)
-    ├── DebrisControllerTests.cs      (NEW)
-    └── MissionsControllerTests.cs    (NEW)
-```
-
-## Implementation Steps
+**Dependências:** Fases 00–06 devem estar com `dotnet build` + `dotnet test` verdes antes de iniciar esta fase.
 
 ---
 
-### Phase 1: Foundation — Base Controller & Middleware
+## Regras críticas (ler antes de qualquer código)
 
-#### Task 1.1: BaseApiController
+| Regra | Detalhe |
+|---|---|
+| Zero lógica de negócio em controllers | Todos os controllers são thin adapters — call service → return result |
+| `stats` ANTES de `{id}` | Em `MissionsController`, `[HttpGet("stats")]` DEVE vir antes de `[HttpGet("{id}")]` |
+| DELETE requer Administrator | `DELETE /api/missions/{id}` → `[Authorize(Roles = "Administrator")]` |
+| Rotas públicas | `status`, `debris`, `destinations`, `launch-windows`, `mission/simulate`, `mission/session` |
+| Rotas autenticadas | `users/me`, `missions/*`, `auth/logout` |
+| Dashboard summary | Opcional — retorna `user: null` sem token, dados do usuário com token |
+| Never expose stack traces | GlobalExceptionMiddleware nunca inclui `ex.StackTrace` na resposta |
+| `public partial class Program {}` | Obrigatório no fim de Program.cs para `WebApplicationFactory<Program>` |
 
-- [ ] Create `MissionClear.Api/Controllers/BaseApiController.cs`
+---
+
+## Arquitetura — arquivos desta fase
+
+```
+MissionClear.Api/
+├── Program.cs                                      (REWRITE — DI completo + Aspire)
+├── Controllers/
+│   ├── BaseApiController.cs                        (CREATE)
+│   ├── AuthController.cs                           (CREATE)
+│   ├── UsersController.cs                          (CREATE)
+│   ├── StatusController.cs                         (CREATE)
+│   ├── DestinationsController.cs                   (CREATE)
+│   ├── DebrisController.cs                         (CREATE)
+│   ├── LaunchWindowsController.cs                  (CREATE)
+│   ├── MissionController.cs                        (CREATE)
+│   ├── MissionsController.cs                       (CREATE — histórico)
+│   └── DashboardController.cs                      (CREATE)
+└── Middleware/
+    └── GlobalExceptionMiddleware.cs                (UPDATE — adicionar DomainException handling)
+
+MissionClear.Tests/
+├── MissionClear.Tests.csproj                       (UPDATE — adicionar Mvc.Testing)
+└── Integration/
+    ├── TestWebApplicationFactory.cs                (CREATE)
+    ├── AuthEndpointTests.cs                        (CREATE)
+    ├── MissionsAuthorizationTests.cs               (CREATE)
+    └── StatusEndpointTests.cs                      (CREATE)
+```
+
+---
+
+## Phase 1: Program.cs Final
+
+### Task 1.1 — Substituir Program.cs completo
+
+**Files:** `MissionClear.Api/Program.cs`
+
+- [ ] Substituir conteúdo completo do arquivo
 
 ```csharp
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
+using MissionClear.Api.Configuration;
+using MissionClear.Api.Data;
+using MissionClear.Api.Data.Repositories;
+using MissionClear.Api.Middleware;
+using MissionClear.Api.Services;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.Tokens;
+using System.Text;
+using System.Text.Json;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Aspire service defaults (OpenTelemetry, health checks, service discovery)
+builder.AddServiceDefaults();
+
+// ── Startup guard ────────────────────────────────────────────────────────────
+var jwtSecret = builder.Configuration["Jwt:Secret"]
+    ?? throw new InvalidOperationException("Jwt:Secret is not configured.");
+if (jwtSecret.Length < 32)
+    throw new InvalidOperationException("Jwt:Secret must be at least 32 characters.");
+
+// ── Typed configuration ───────────────────────────────────────────────────────
+builder.Services.Configure<JwtSettings>(
+    builder.Configuration.GetSection(JwtSettings.SectionName));
+builder.Services.Configure<OrbitalSettings>(
+    builder.Configuration.GetSection(OrbitalSettings.SectionName));
+builder.Services.Configure<ExternalApiSettings>(
+    builder.Configuration.GetSection(ExternalApiSettings.SectionName));
+builder.Services.Configure<CorsSettings>(
+    builder.Configuration.GetSection(CorsSettings.SectionName));
+
+// ── MySQL via Aspire Pomelo integration ───────────────────────────────────────
+builder.AddMySqlDbContext<AppDbContext>("missionclear");
+
+// ── CORS ─────────────────────────────────────────────────────────────────────
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("MobileApp", policy =>
+    {
+        if (builder.Environment.IsDevelopment())
+            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+        else
+        {
+            var cors = builder.Configuration
+                .GetSection(CorsSettings.SectionName)
+                .Get<CorsSettings>();
+            policy.WithOrigins(cors?.AllowedOrigins ?? [])
+                  .AllowAnyMethod()
+                  .AllowAnyHeader();
+        }
+    });
+});
+
+// ── JWT Bearer Authentication ─────────────────────────────────────────────────
+builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
+    .AddJwtBearer(options =>
+    {
+        var jwtSettings = builder.Configuration
+            .GetSection(JwtSettings.SectionName)
+            .Get<JwtSettings>()!;
+
+        options.TokenValidationParameters = new TokenValidationParameters
+        {
+            ValidateIssuer           = true,
+            ValidateAudience         = true,
+            ValidateLifetime         = true,
+            ValidateIssuerSigningKey = true,
+            ValidIssuer              = jwtSettings.Issuer,
+            ValidAudience            = jwtSettings.Audience,
+            IssuerSigningKey         = new SymmetricSecurityKey(
+                                           Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+        };
+    });
+
+builder.Services.AddAuthorization();
+
+// ── Controllers ───────────────────────────────────────────────────────────────
+builder.Services.AddControllers()
+    .AddJsonOptions(options =>
+    {
+        options.JsonSerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower;
+    });
+
+builder.Services.AddHttpClient();
+
+// ── Repositories (Scoped — EF Core DbContext lifecycle) ───────────────────────
+builder.Services.AddScoped<IUserRepository,         UserRepository>();
+builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
+builder.Services.AddScoped<IMissionRepository,      MissionRepository>();
+
+// ── Services ──────────────────────────────────────────────────────────────────
+builder.Services.AddSingleton<IOrbitalCache,                OrbitalCache>();
+builder.Services.AddScoped<IDataAggregatorService,          DataAggregatorService>();
+builder.Services.AddSingleton<IOrbitalEngineService,         OrbitalEngineService>();
+builder.Services.AddScoped<IConjunctionDetector,            ConjunctionDetector>();
+builder.Services.AddScoped<ILaunchWindowCalculator,         LaunchWindowCalculator>();
+builder.Services.AddScoped<IMissionSimulationService,       MissionSimulationService>();
+builder.Services.AddSingleton<ISessionStore,                SessionStore>();
+builder.Services.AddScoped<IMissionSseService,              MissionSseService>();
+builder.Services.AddScoped<IJwtService,                     JwtService>();
+builder.Services.AddScoped<IAuthService,                    AuthService>();
+builder.Services.AddScoped<IUserService,                    UserService>();
+builder.Services.AddScoped<IMissionHistoryService,          MissionHistoryService>();
+builder.Services.AddScoped<IDashboardService,               DashboardService>();
+
+// ── Background services ───────────────────────────────────────────────────────
+builder.Services.AddHostedService<TleIngestionService>();
+
+// ─────────────────────────────────────────────────────────────────────────────
+var app = builder.Build();
+
+// ── Auto-migrate on startup ───────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await db.Database.MigrateAsync();
+}
+
+// ── Middleware pipeline (order matters) ───────────────────────────────────────
+app.UseMiddleware<GlobalExceptionMiddleware>();
+app.UseCors("MobileApp");
+app.UseAuthentication();
+app.UseAuthorization();
+app.MapControllers();
+app.MapDefaultEndpoints(); // Aspire health endpoints
+
+app.Run();
+
+// Required for WebApplicationFactory<Program> in integration tests
+public partial class Program { }
+```
+
+- [ ] Commit: `chore(api): Program.cs final — Aspire DI, JWT, CORS, auto-migrate`
+
+---
+
+## Phase 2: BaseApiController + GlobalExceptionMiddleware
+
+### Task 2.1 — BaseApiController
+
+**Files:** `MissionClear.Api/Controllers/BaseApiController.cs`
+
+- [ ] Criar arquivo
+
+```csharp
+using System.Security.Claims;
 using Microsoft.AspNetCore.Mvc;
 
 namespace MissionClear.Api.Controllers;
 
 [ApiController]
+[Route("api/[controller]")]
 public abstract class BaseApiController : ControllerBase
 {
-    protected string? GetUserId() =>
-        User.FindFirst("sub")?.Value
-        ?? User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+    /// <summary>
+    /// Returns the authenticated user's Guid.
+    /// Checks ClaimTypes.NameIdentifier first, then "sub" claim (JWT standard).
+    /// Returns Guid.Empty when not authenticated or claim is missing/malformed.
+    /// </summary>
+    protected Guid CurrentUserId =>
+        Guid.TryParse(
+            User.FindFirstValue(ClaimTypes.NameIdentifier)
+            ?? User.FindFirstValue("sub"),
+            out var id)
+        ? id : Guid.Empty;
 
-    protected IActionResult DomainError(DomainException ex) => ex.StatusCode switch
-    {
-        400 => BadRequest(ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        401 => Unauthorized(ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        403 => StatusCode(403, ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        404 => NotFound(ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        409 => Conflict(ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        503 => StatusCode(503, ApiErrorDto.Make(ex.ErrorCode, ex.Message)),
-        _   => StatusCode(500, ApiErrorDto.InternalError())
-    };
-
-    protected IActionResult? RequireParam(string? value, string paramName)
-    {
-        if (string.IsNullOrWhiteSpace(value))
-            return BadRequest(ApiErrorDto.Make("MISSING_PARAMETER", $"Required parameter '{paramName}' is missing."));
-        return null;
-    }
+    /// <summary>True when the request carries a valid, authenticated identity.</summary>
+    protected bool IsAuthenticated => User.Identity?.IsAuthenticated == true;
 }
 ```
 
-#### Task 1.2: Global Exception Middleware
+### Task 2.2 — GlobalExceptionMiddleware (update)
 
-- [ ] Create `MissionClear.Api/Middleware/GlobalExceptionMiddleware.cs`
+**Files:** `MissionClear.Api/Middleware/GlobalExceptionMiddleware.cs`
+
+- [ ] Reescrever/atualizar para capturar `DomainException` com `ErrorCode` + `HttpStatus` da exceção, e nunca expor stack trace
 
 ```csharp
-using System.Text.Json;
-using MissionClear.Api.Dtos;
+using MissionClear.Api.Dtos.Common;
 using MissionClear.Api.Exceptions;
+using System.Text.Json;
 
 namespace MissionClear.Api.Middleware;
 
-public sealed class GlobalExceptionMiddleware
+public sealed class GlobalExceptionMiddleware(
+    RequestDelegate next,
+    ILogger<GlobalExceptionMiddleware> logger)
 {
-    private readonly RequestDelegate _next;
-    private readonly ILogger<GlobalExceptionMiddleware> _logger;
-    private readonly IHostEnvironment _env;
-
-    public GlobalExceptionMiddleware(
-        RequestDelegate next,
-        ILogger<GlobalExceptionMiddleware> logger,
-        IHostEnvironment env)
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
-        _next = next;
-        _logger = logger;
-        _env = env;
-    }
+        PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
+    };
 
-    public async Task InvokeAsync(HttpContext ctx)
+    public async Task InvokeAsync(HttpContext context)
     {
         try
         {
-            await _next(ctx);
+            await next(context);
         }
-        catch (DomainException dex)
+        catch (DomainException ex)
         {
-            _logger.LogWarning(dex, "Domain exception: {Code}", dex.ErrorCode);
-            await WriteAsync(ctx, dex.StatusCode, ApiErrorDto.Make(dex.ErrorCode, dex.Message));
+            logger.LogWarning("Domain error {Code} (HTTP {Status}): {Message}",
+                ex.ErrorCode, ex.HttpStatus, ex.Message);
+
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode    = ex.HttpStatus;
+                context.Response.ContentType   = "application/json";
+                var error = new ApiErrorDto(
+                    ex.ErrorCode,
+                    ex.Message,
+                    DateTime.UtcNow.ToString("O"));
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(error, JsonOptions));
+            }
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Unhandled exception");
-            var body = _env.IsProduction()
-                ? ApiErrorDto.InternalError()
-                : ApiErrorDto.Make("INTERNAL_ERROR", ex.Message);
-            await WriteAsync(ctx, 500, body);
-        }
-    }
+            logger.LogError(ex, "Unexpected unhandled exception");
 
-    private static async Task WriteAsync(HttpContext ctx, int status, ApiErrorDto body)
-    {
-        if (ctx.Response.HasStarted) return;
-        ctx.Response.Clear();
-        ctx.Response.StatusCode = status;
-        ctx.Response.ContentType = "application/json";
-        await ctx.Response.WriteAsync(JsonSerializer.Serialize(body));
+            if (!context.Response.HasStarted)
+            {
+                context.Response.StatusCode    = 500;
+                context.Response.ContentType   = "application/json";
+                // Never expose ex.Message or stack trace in production response
+                var error = new ApiErrorDto(
+                    "INTERNAL_ERROR",
+                    "An unexpected error occurred.",
+                    DateTime.UtcNow.ToString("O"));
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(error, JsonOptions));
+            }
+        }
     }
 }
 ```
 
-- [ ] Register in `Program.cs` BEFORE `app.UseAuthentication()`:
+**Nota:** Use `ex.HttpStatus` — this is the canonical property name defined in plan-02.
 
-```csharp
-app.UseMiddleware<MissionClear.Api.Middleware.GlobalExceptionMiddleware>();
-```
-
-- [ ] Commit: `feat(api): base controller + global exception middleware`
+- [ ] Commit: `feat(api): BaseApiController + updated GlobalExceptionMiddleware`
 
 ---
 
-### Phase 2: Auth & Users
+## Phase 3: Auth & Users Controllers
 
-#### Task 2.1: AuthController
+### Task 3.1 — AuthController
 
-- [ ] Create `MissionClear.Api/Controllers/AuthController.cs`
+**Files:** `MissionClear.Api/Controllers/AuthController.cs`
+
+Route: `api/auth`
+
+- [ ] Criar arquivo
 
 ```csharp
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
 using MissionClear.Api.Dtos.Auth;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 
 namespace MissionClear.Api.Controllers;
 
-[Route("api/auth")]
-public sealed class AuthController : BaseApiController
+public sealed class AuthController(IAuthService authService) : BaseApiController
 {
-    private readonly IAuthService _auth;
-
-    public AuthController(IAuthService auth) => _auth = auth;
-
+    // POST api/auth/register — public
     [HttpPost("register")]
-    public async Task<IActionResult> Register([FromBody] AuthRegisterRequest request, CancellationToken ct)
-    {
-        try
-        {
-            var result = await _auth.RegisterAsync(request, ct);
-            return StatusCode(201, result);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpPost("login")]
-    public async Task<IActionResult> Login([FromBody] AuthLoginRequest request, CancellationToken ct)
-    {
-        try
-        {
-            var result = await _auth.LoginAsync(request, ct);
-            return Ok(result);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpPost("refresh")]
-    public async Task<IActionResult> Refresh([FromBody] AuthRefreshRequest request, CancellationToken ct)
-    {
-        try
-        {
-            var result = await _auth.RefreshAsync(request, ct);
-            return Ok(result);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [Authorize]
-    [HttpPost("logout")]
-    public async Task<IActionResult> Logout(CancellationToken ct)
-    {
-        try
-        {
-            var userId = GetUserId();
-            if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-            await _auth.LogoutAsync(userId, ct);
-            return NoContent();
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-}
-```
-
-#### Task 2.2: UsersController
-
-- [ ] Create `MissionClear.Api/Controllers/UsersController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services;
-
-namespace MissionClear.Api.Controllers;
-
-[Authorize]
-[Route("api/users")]
-public sealed class UsersController : BaseApiController
-{
-    private readonly IUserService _users;
-
-    public UsersController(IUserService users) => _users = users;
-
-    [HttpGet("me")]
-    public async Task<IActionResult> Me(CancellationToken ct)
-    {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-        try
-        {
-            var profile = await _users.GetMeAsync(userId, ct);
-            return Ok(profile);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpPut("me")]
-    public async Task<IActionResult> UpdateMe([FromBody] UpdateUserRequest request, CancellationToken ct)
-    {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-        try
-        {
-            var updated = await _users.UpdateMeAsync(userId, request, ct);
-            return Ok(updated);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-}
-```
-
-- [ ] Commit: `feat(controllers): auth + users endpoints`
-
----
-
-### Phase 3: Status, Debris, Destinations
-
-#### Task 3.1: StatusController
-
-- [ ] Create `MissionClear.Api/Controllers/StatusController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Services.Orbital;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/status")]
-public sealed class StatusController : BaseApiController
-{
-    private readonly OrbitalCache _cache;
-    private readonly IConfiguration _config;
-    private static readonly long _startTicks = Environment.TickCount64;
-
-    public StatusController(OrbitalCache cache, IConfiguration config)
-    {
-        _cache = cache;
-        _config = config;
-    }
-
-    [HttpGet]
-    public IActionResult Get()
-    {
-        var keepTrackKey = _config["KeepTrack:ApiKey"];
-        return Ok(new
-        {
-            status = _cache.IsReady ? "ready" : "loading",
-            tle_count = _cache.TleCount,
-            propagated_count = _cache.GetPropagatedObjects().Count,
-            last_tle_fetch = _cache.LastFetch,
-            last_propagation = _cache.LastPropagation,
-            uptime_seconds = (Environment.TickCount64 - _startTicks) / 1000,
-            sources = new
-            {
-                celestrak = "active",
-                keeptrack = string.IsNullOrWhiteSpace(keepTrackKey) ? "not_configured" : "configured"
-            }
-        });
-    }
-}
-```
-
-#### Task 3.2: DebrisController
-
-- [ ] Create `MissionClear.Api/Controllers/DebrisController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Services.Orbital;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/debris")]
-public sealed class DebrisController : BaseApiController
-{
-    private const int MaxLimit = 1000;
-    private const int DefaultLimit = 100;
-
-    private readonly OrbitalCache _cache;
-
-    public DebrisController(OrbitalCache cache) => _cache = cache;
-
-    [HttpGet]
-    public IActionResult List(
-        [FromQuery] string? type,
-        [FromQuery(Name = "min_altitude")] double? minAltitude,
-        [FromQuery(Name = "max_altitude")] double? maxAltitude,
-        [FromQuery] string? source,
-        [FromQuery] int? limit)
-    {
-        if (!_cache.IsReady)
-            return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var effectiveLimit = Math.Min(limit ?? DefaultLimit, MaxLimit);
-
-        var query = _cache.GetPropagatedObjects().AsEnumerable();
-        if (!string.IsNullOrWhiteSpace(type))
-            query = query.Where(d => string.Equals(d.Type, type, StringComparison.OrdinalIgnoreCase));
-        if (minAltitude.HasValue)
-            query = query.Where(d => d.AltitudeKm >= minAltitude.Value);
-        if (maxAltitude.HasValue)
-            query = query.Where(d => d.AltitudeKm <= maxAltitude.Value);
-        if (!string.IsNullOrWhiteSpace(source))
-            query = query.Where(d => string.Equals(d.Source, source, StringComparison.OrdinalIgnoreCase));
-
-        return Ok(query.Take(effectiveLimit).Select(DebrisDto.From).ToList());
-    }
-
-    [HttpGet("stats")]
-    public IActionResult Stats()
-    {
-        if (!_cache.IsReady)
-            return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var all = _cache.GetPropagatedObjects();
-        var byType = all
-            .GroupBy(d => d.Type ?? "unknown")
-            .ToDictionary(g => g.Key, g => g.Count());
-
-        var byBand = new Dictionary<string, int>
-        {
-            ["leo_low_200_500"]    = all.Count(d => d.AltitudeKm >= 200 && d.AltitudeKm < 500),
-            ["leo_mid_500_1000"]   = all.Count(d => d.AltitudeKm >= 500 && d.AltitudeKm < 1000),
-            ["leo_high_1000_2000"] = all.Count(d => d.AltitudeKm >= 1000 && d.AltitudeKm <= 2000),
-        };
-
-        return Ok(new
-        {
-            total_count = all.Count,
-            by_type = byType,
-            by_altitude_band = byBand,
-            last_updated = _cache.LastPropagation
-        });
-    }
-
-    [HttpGet("{id}")]
-    public IActionResult Get(string id)
-    {
-        if (!_cache.IsReady)
-            return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var item = _cache.GetPropagatedObjects()
-            .FirstOrDefault(d => string.Equals(d.NoradCatId, id, StringComparison.OrdinalIgnoreCase));
-
-        if (item is null)
-            return NotFound(ApiErrorDto.Make("DEBRIS_NOT_FOUND", $"Debris '{id}' not found."));
-
-        return Ok(DebrisDto.From(item));
-    }
-}
-```
-
-#### Task 3.3: DestinationsController
-
-- [ ] Create `MissionClear.Api/Controllers/DestinationsController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Domain;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/destinations")]
-public sealed class DestinationsController : BaseApiController
-{
-    [HttpGet]
-    public IActionResult List() =>
-        Ok(KnownDestinations.AllDestinations.Select(DestinationDto.From).ToList());
-}
-```
-
-- [ ] Commit: `feat(controllers): status + debris + destinations endpoints`
-
----
-
-### Phase 4: Launch Windows & Mission
-
-#### Task 4.1: LaunchWindowsController
-
-- [ ] Create `MissionClear.Api/Controllers/LaunchWindowsController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services.LaunchWindows;
-using MissionClear.Api.Services.Orbital;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/launch-windows")]
-public sealed class LaunchWindowsController : BaseApiController
-{
-    private const int MaxRangeDays = 7;
-    private const int MaxTopN = 20;
-    private const int DefaultTopN = 5;
-
-    private readonly ILaunchWindowCalculator _calculator;
-    private readonly OrbitalCache _cache;
-
-    public LaunchWindowsController(ILaunchWindowCalculator calculator, OrbitalCache cache)
-    {
-        _calculator = calculator;
-        _cache = cache;
-    }
-
-    [HttpGet]
-    public IActionResult List(
-        [FromQuery] string? destination,
-        [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to)
-    {
-        if (!_cache.IsReady) return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var paramError = ValidateRange(destination, from, to);
-        if (paramError is not null) return paramError;
-
-        var result = _calculator.Calculate(destination!, from!.Value, to!.Value,
-            _cache.GetPropagatedObjects());
-        return Ok(new { destination, from, to, windows = result });
-    }
-
-    [HttpGet("best")]
-    public IActionResult Best(
-        [FromQuery] string? destination,
-        [FromQuery] DateTime? from,
-        [FromQuery] DateTime? to,
-        [FromQuery(Name = "top_n")] int? topN)
-    {
-        if (!_cache.IsReady) return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var paramError = ValidateRange(destination, from, to);
-        if (paramError is not null) return paramError;
-
-        var effectiveTopN = Math.Min(topN ?? DefaultTopN, MaxTopN);
-        if (effectiveTopN <= 0)
-            return BadRequest(ApiErrorDto.Make("INVALID_PARAMETER", "top_n must be > 0."));
-
-        var result = _calculator.Calculate(destination!, from!.Value, to!.Value,
-            _cache.GetPropagatedObjects(), maxWindows: effectiveTopN);
-        return Ok(new { destination, from, to, windows = result });
-    }
-
-    private IActionResult? ValidateRange(string? destination, DateTime? from, DateTime? to)
-    {
-        if (string.IsNullOrWhiteSpace(destination))
-            return BadRequest(ApiErrorDto.Make("MISSING_PARAMETER", "destination is required."));
-        if (!from.HasValue || !to.HasValue)
-            return BadRequest(ApiErrorDto.Make("MISSING_PARAMETER", "from and to are required."));
-        if (from.Value >= to.Value)
-            return BadRequest(ApiErrorDto.Make("INVALID_RANGE", "from must be earlier than to."));
-        if ((to.Value - from.Value).TotalDays > MaxRangeDays)
-            return BadRequest(ApiErrorDto.Make("INVALID_RANGE", $"Range cannot exceed {MaxRangeDays} days."));
-        return null;
-    }
-}
-```
-
-#### Task 4.2: MissionController
-
-- [ ] Create `MissionClear.Api/Controllers/MissionController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services;
-using MissionClear.Api.Services.Missions;
-using MissionClear.Api.Services.Orbital;
-using MissionClear.Api.Services.Sessions;
-using MissionClear.Api.Services.Streaming;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/mission")]
-public sealed class MissionController : BaseApiController
-{
-    private readonly IMissionSimulationService _simulation;
-    private readonly SessionStore _sessions;
-    private readonly MissionSseService _sse;
-    private readonly OrbitalCache _cache;
-    private readonly IMissionHistoryService _history;
-
-    public MissionController(
-        IMissionSimulationService simulation,
-        SessionStore sessions,
-        MissionSseService sse,
-        OrbitalCache cache,
-        IMissionHistoryService history)
-    {
-        _simulation = simulation;
-        _sessions = sessions;
-        _sse = sse;
-        _cache = cache;
-        _history = history;
-    }
-
-    [HttpPost("simulate")]
-    public IActionResult Simulate([FromBody] MissionSimulateRequest request)
-    {
-        if (!_cache.IsReady) return StatusCode(503, ApiErrorDto.CacheNotReady());
-        if (request is null || string.IsNullOrWhiteSpace(request.DestinationId))
-            return BadRequest(ApiErrorDto.Make("MISSING_PARAMETER", "destination is required."));
-
-        try
-        {
-            var result = _simulation.Simulate(request, _cache.GetPropagatedObjects());
-            return Ok(result);
-        }
-        catch (ArgumentException ex)
-        {
-            return NotFound(ApiErrorDto.Make("DESTINATION_NOT_FOUND", ex.Message));
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpPost("session")]
-    public IActionResult CreateSession([FromBody] SessionRequest request)
-    {
-        if (request is null || string.IsNullOrWhiteSpace(request.DestinationId))
-            return BadRequest(ApiErrorDto.Make("MISSING_PARAMETER", "destination is required."));
-
-        var session = _sessions.CreateSession(GetUserId(), request);
-        var streamUrl = $"/api/mission/session/{session.SessionId}/stream";
-        return Ok(new { session_id = session.SessionId, stream_url = streamUrl, created_at = session.CreatedAtUtc });
-    }
-
-    [HttpGet("session/{id}/stream")]
-    public async Task Stream(string id, CancellationToken ct)
-    {
-        Response.Headers["Content-Type"] = "text/event-stream";
-        Response.Headers["Cache-Control"] = "no-cache";
-        Response.Headers["Connection"] = "keep-alive";
-        Response.Headers["X-Accel-Buffering"] = "no";
-
-        var debris = _cache.IsReady ? _cache.GetPropagatedObjects() : Array.Empty<OrbitalObject>();
-        await _sse.StreamAsync(id, Response, debris, ct);
-    }
-
-    [HttpPost("session/{id}/complete")]
-    public async Task<IActionResult> Complete(string id, [FromBody] SessionCompleteRequest request, CancellationToken ct)
-    {
-        try
-        {
-            var userId = GetUserId();
-            string? missionId = null;
-
-            if (request?.SaveToHistory == true && userId is not null)
-            {
-                var session = _sessions.GetSession(id);
-                if (session is not null)
-                {
-                    var saved = await _history.SaveMissionAsync(
-                        userId, id,
-                        session.Status,
-                        session.FinalRiskScore,
-                        session.DeltaVKmS,
-                        session.ObstaclesEncountered,
-                        "[]",
-                        session.DestinationId ?? "ISS",
-                        session.CreatedAtUtc,
-                        session.CompletedAtUtc ?? DateTime.UtcNow,
-                        ct);
-                    missionId = saved.Id;
-                }
-            }
-
-            _sessions.TryCompleteSession(id, Domain.SessionStatus.Success, 0, 0, 0, 0, 0);
-
-            return Ok(new { session_id = id, saved = missionId is not null, mission_id = missionId });
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-}
-```
-
-- [ ] Commit: `feat(controllers): launch-windows + mission (simulate + sse)`
-
----
-
-### Phase 5: History & Dashboard
-
-#### Task 5.1: MissionsController (history)
-
-- [ ] Create `MissionClear.Api/Controllers/MissionsController.cs`
-
-**CRITICAL:** `[HttpGet("stats")]` MUST be declared BEFORE `[HttpGet("{id}")]` to prevent "stats" being matched as an id.
-
-```csharp
-using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services;
-
-namespace MissionClear.Api.Controllers;
-
-[Authorize]
-[Route("api/missions")]
-public sealed class MissionsController : BaseApiController
-{
-    private const int DefaultLimit = 20;
-    private const int MaxLimit = 100;
-
-    private readonly IMissionHistoryService _history;
-
-    public MissionsController(IMissionHistoryService history) => _history = history;
-
-    // IMPORTANT: BEFORE {id} route — "stats" must never be matched as an id
-    [HttpGet("stats")]
-    public async Task<IActionResult> Stats(CancellationToken ct)
-    {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-        try
-        {
-            var stats = await _history.GetStatsAsync(userId, ct);
-            return Ok(stats);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpGet]
-    public async Task<IActionResult> List(
-        [FromQuery] int? page,
-        [FromQuery] int? limit,
-        [FromQuery] string? status,
+    public async Task<IActionResult> Register(
+        [FromBody] RegisterRequest request,
         CancellationToken ct)
     {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-
-        var effectivePage = Math.Max(page ?? 1, 1);
-        var effectiveLimit = Math.Min(Math.Max(limit ?? DefaultLimit, 1), MaxLimit);
-
-        try
-        {
-            var result = await _history.GetMissionsAsync(userId, effectivePage, effectiveLimit, status, ct);
-            return Ok(result);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
+        var result = await authService.RegisterAsync(request, ct);
+        return StatusCode(201, result);
     }
 
-    [HttpGet("{id}")]
-    public async Task<IActionResult> Get(string id, CancellationToken ct)
+    // POST api/auth/login — public
+    [HttpPost("login")]
+    public async Task<IActionResult> Login(
+        [FromBody] LoginRequest request,
+        CancellationToken ct)
     {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-        try
-        {
-            var mission = await _history.GetMissionAsync(userId, id, ct);
-            return Ok(mission);
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-
-    [HttpDelete("{id}")]
-    public async Task<IActionResult> Delete(string id, CancellationToken ct)
-    {
-        var userId = GetUserId();
-        if (userId is null) return Unauthorized(ApiErrorDto.Make("UNAUTHORIZED", "Missing user claim."));
-        try
-        {
-            await _history.DeleteMissionAsync(userId, id, ct);
-            return NoContent();
-        }
-        catch (DomainException ex) { return DomainError(ex); }
-    }
-}
-```
-
-#### Task 5.2: DashboardController
-
-- [ ] Create `MissionClear.Api/Controllers/DashboardController.cs`
-
-```csharp
-using Microsoft.AspNetCore.Mvc;
-using MissionClear.Api.Dtos;
-using MissionClear.Api.Exceptions;
-using MissionClear.Api.Services;
-using MissionClear.Api.Services.Orbital;
-
-namespace MissionClear.Api.Controllers;
-
-[Route("api/dashboard")]
-public sealed class DashboardController : BaseApiController
-{
-    private const int DefaultWindowHours = 24;
-    private const int MaxWindowHours = 72;
-
-    private readonly IDashboardService _dashboard;
-    private readonly OrbitalCache _cache;
-    private readonly IUserService _users;
-
-    public DashboardController(IDashboardService dashboard, OrbitalCache cache, IUserService users)
-    {
-        _dashboard = dashboard;
-        _cache = cache;
-        _users = users;
-    }
-
-    [HttpGet("summary")]
-    public async Task<IActionResult> Summary(CancellationToken ct)
-    {
-        if (!_cache.IsReady) return StatusCode(503, ApiErrorDto.CacheNotReady());
-
-        var userId = GetUserId();
-        UserResponse? userDto = null;
-        if (userId is not null)
-        {
-            try { userDto = await _users.GetMeAsync(userId, ct); }
-            catch (DomainException) { /* anonymous fallback */ }
-        }
-
-        var debris = _cache.GetPropagatedObjects();
-        var result = _dashboard.GetSummary(userId, userDto, debris);
+        var result = await authService.LoginAsync(request, ct);
         return Ok(result);
     }
 
-    [HttpGet("alerts")]
-    public IActionResult Alerts([FromQuery(Name = "window_hours")] int? windowHours)
+    // POST api/auth/refresh — public
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(
+        [FromBody] RefreshRequest request,
+        CancellationToken ct)
     {
-        if (!_cache.IsReady) return StatusCode(503, ApiErrorDto.CacheNotReady());
+        var result = await authService.RefreshAsync(request, ct);
+        return Ok(result);
+    }
 
-        var effective = Math.Min(Math.Max(windowHours ?? DefaultWindowHours, 1), MaxWindowHours);
-        var debris = _cache.GetPropagatedObjects();
-        var alerts = _dashboard.GetAlerts(debris, effective);
-        return Ok(alerts);
+    // POST api/auth/logout — requires auth
+    [Authorize]
+    [HttpPost("logout")]
+    public async Task<IActionResult> Logout(
+        [FromBody] LogoutRequest request,
+        CancellationToken ct)
+    {
+        await authService.LogoutAsync(request, ct);
+        return NoContent();
     }
 }
 ```
 
-- [ ] Commit: `feat(controllers): missions history + dashboard endpoints`
+### Task 3.2 — UsersController
+
+**Files:** `MissionClear.Api/Controllers/UsersController.cs`
+
+Route: `api/users` — all endpoints require `[Authorize]`
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Dtos.User;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+[Authorize]
+public sealed class UsersController(IUserService userService) : BaseApiController
+{
+    // GET api/users/me
+    [HttpGet("me")]
+    public async Task<IActionResult> GetMe(CancellationToken ct)
+    {
+        var profile = await userService.GetProfileAsync(CurrentUserId, ct);
+        return Ok(profile);
+    }
+
+    // PUT api/users/me
+    [HttpPut("me")]
+    public async Task<IActionResult> UpdateMe(
+        [FromBody] UpdateUserRequest request,
+        CancellationToken ct)
+    {
+        var profile = await userService.UpdateProfileAsync(CurrentUserId, request, ct);
+        return Ok(profile);
+    }
+}
+```
+
+- [ ] Commit: `feat(controllers): AuthController + UsersController`
 
 ---
 
-### Phase 6: Integration Tests
+## Phase 4: Orbital Public Endpoints
 
-#### Task 6.1: Add NuGet packages to MissionClear.Tests
+### Task 4.1 — StatusController
 
-```xml
-<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.0.10" />
-```
+**Files:** `MissionClear.Api/Controllers/StatusController.cs`
 
-#### Task 6.2: TestWebApplicationFactory
+Route: `api/status` — public
 
-- [ ] Create `MissionClear.Tests/Controllers/TestWebApplicationFactory.cs`
+- [ ] Criar arquivo
 
 ```csharp
+using MissionClear.Api.Dtos.Status;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class StatusController(IOrbitalCache cache) : BaseApiController
+{
+    private static readonly DateTime StartTime = DateTime.UtcNow;
+
+    // GET api/status
+    [HttpGet]
+    public IActionResult Get()
+    {
+        return Ok(new StatusResponse(
+            Status:            cache.IsReady ? "ready" : "loading",
+            TleCount:          cache.Count,
+            PropagatedCount:   cache.Count,
+            LastTleFetch:      cache.LastFetch?.ToString("O"),
+            LastPropagation:   cache.LastPropagation?.ToString("O"),
+            UptimeSeconds:     (long)(DateTime.UtcNow - StartTime).TotalSeconds,
+            Sources:           new SourceStatusDto("ok", "unavailable")));
+    }
+}
+```
+
+### Task 4.2 — DestinationsController
+
+**Files:** `MissionClear.Api/Controllers/DestinationsController.cs`
+
+Route: `api/destinations` — public
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Dtos.Destination;
+using MissionClear.Api.Models;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class DestinationsController : BaseApiController
+{
+    // GET api/destinations
+    [HttpGet]
+    public IActionResult Get()
+    {
+        var dtos = KnownDestinations.All
+            .Select(d => new DestinationDto(
+                d.Id,
+                d.DisplayName,
+                d.AltitudeKm,
+                d.InclinationDeg,
+                d.Description,
+                d.DeltaVKmS,
+                d.MissionDurationHours,
+                d.Icon))
+            .ToList();
+
+        return Ok(new DestinationsResponse(dtos));
+    }
+}
+```
+
+### Task 4.3 — DebrisController
+
+**Files:** `MissionClear.Api/Controllers/DebrisController.cs`
+
+Route: `api/debris` — public. CRITICAL: `stats` route declared BEFORE `{id}`.
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Dtos.Orbital;
+using MissionClear.Api.Exceptions;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class DebrisController(IOrbitalCache cache) : BaseApiController
+{
+    // GET api/debris
+    [HttpGet]
+    public IActionResult GetAll(
+        [FromQuery] double altitudeMinKm = 200,
+        [FromQuery] double altitudeMaxKm = 2000,
+        [FromQuery] string? type         = null,
+        [FromQuery] int    limit         = 500)
+    {
+        if (!cache.IsReady)
+            throw new DomainException("CACHE_NOT_READY", "Orbital data is still loading.", 503);
+
+        var query = cache.GetAll()
+            .Where(o => o.AltitudeKm >= altitudeMinKm && o.AltitudeKm <= altitudeMaxKm);
+
+        if (!string.IsNullOrEmpty(type))
+            query = query.Where(o => o.Type == type);
+
+        var result = query
+            .Take(Math.Min(limit, 2000))
+            .Select(o => new DebrisDto(
+                o.Id, o.Name, o.Type,
+                o.Latitude, o.Longitude,
+                o.AltitudeKm, o.VelocityKmS,
+                o.Source, o.UpdatedAt.ToString("O")))
+            .ToList();
+
+        Response.Headers.CacheControl = "max-age=60";
+        return Ok(result);
+    }
+
+    // GET api/debris/stats  ← MUST be before {id}
+    [HttpGet("stats")]
+    public IActionResult GetStats()
+    {
+        if (!cache.IsReady)
+            throw new DomainException("CACHE_NOT_READY", "Orbital data is still loading.", 503);
+
+        var all = cache.GetAll();
+        int debris = 0, satellite = 0, rocket = 0, low = 0, mid = 0, high = 0;
+
+        foreach (var o in all)
+        {
+            switch (o.Type)
+            {
+                case "debris":      debris++;  break;
+                case "satellite":   satellite++; break;
+                case "rocket_body": rocket++;  break;
+            }
+            if      (o.AltitudeKm < 500)  low++;
+            else if (o.AltitudeKm < 1000) mid++;
+            else                          high++;
+        }
+
+        return Ok(new DebrisStatsDto(
+            TotalTracked: all.Count,
+            ByType:       new ByTypeDto(debris, satellite, rocket),
+            ByAltitudeBand: new ByAltitudeBandDto(low, mid, high),
+            Sources:      new SourcesDto(
+                              all.Count(o => o.Source == "celestrak"),
+                              all.Count(o => o.Source == "keeptrack")),
+            LastUpdated:  (cache.LastPropagation ?? DateTime.UtcNow).ToString("O")));
+    }
+
+    // GET api/debris/{id}  ← AFTER stats
+    [HttpGet("{id}")]
+    public IActionResult GetById(string id)
+    {
+        if (!cache.IsReady)
+            throw new DomainException("CACHE_NOT_READY", "Orbital data is still loading.", 503);
+
+        var obj = cache.GetById(id)
+            ?? throw new DomainException("DEBRIS_NOT_FOUND", $"Object {id} not found.", 404);
+
+        TleDto? tle = null;
+        if (obj.TleLine1 != null && obj.TleLine2 != null)
+            tle = new TleDto(obj.TleEpoch ?? "", obj.TleLine1, obj.TleLine2);
+
+        OrbitParamsDto? orbit = null;
+        if (obj.InclinationDeg.HasValue)
+            orbit = new OrbitParamsDto(
+                obj.InclinationDeg.Value,
+                obj.Eccentricity    ?? 0,
+                obj.PeriodMinutes   ?? 0,
+                obj.ApogeeKm        ?? 0,
+                obj.PerigeeKm       ?? 0);
+
+        return Ok(new DebrisDetailDto(
+            obj.Id, obj.Name, obj.Type,
+            obj.Latitude, obj.Longitude,
+            obj.AltitudeKm, obj.VelocityKmS,
+            obj.Source, obj.UpdatedAt.ToString("O"),
+            tle, orbit));
+    }
+}
+```
+
+- [ ] Commit: `feat(controllers): StatusController + DestinationsController + DebrisController`
+
+---
+
+## Phase 5: Launch Windows & Mission Controllers
+
+### Task 5.1 — LaunchWindowsController
+
+**Files:** `MissionClear.Api/Controllers/LaunchWindowsController.cs`
+
+Route: `api/launch-windows` — public
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Dtos.Common;
+using MissionClear.Api.Exceptions;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class LaunchWindowsController(
+    ILaunchWindowCalculator calculator,
+    IOrbitalCache           cache) : BaseApiController
+{
+    // GET api/launch-windows
+    [HttpGet]
+    public IActionResult GetAll(
+        [FromQuery] string? destination,
+        [FromQuery] string? from,
+        [FromQuery] string? to)
+    {
+        ParseAndValidate(destination, from, to, out var dest, out var fromDt, out var toDt);
+        var debris  = RequireCache();
+        var windows = calculator.Calculate(dest, fromDt, toDt, debris);
+
+        var dtos = windows
+            .Select(w => new LaunchWindowDto(
+                w.Start.ToString("O"), w.End.ToString("O"),
+                w.RiskScore, w.DeltaVKmS, w.DurationHours, w.IsRecommended,
+                w.Conjunctions
+                    .Select(c => new ConjunctionDto(
+                        c.DebrisId, c.DebrisName,
+                        c.ClosestApproachKm,
+                        c.TimeOfClosestApproach.ToString("O"),
+                        c.RiskLevel.ToString().ToLowerInvariant()))
+                    .ToList()))
+            .ToList();
+
+        return Ok(new
+        {
+            destination  = dest.DisplayName,
+            from         = fromDt.ToString("O"),
+            to           = toDt.ToString("O"),
+            total_windows = dtos.Count,
+            safe_windows  = dtos.Count(w => w.IsRecommended),
+            windows       = dtos
+        });
+    }
+
+    // GET api/launch-windows/best
+    [HttpGet("best")]
+    public IActionResult GetBest(
+        [FromQuery] string? destination,
+        [FromQuery] string? from,
+        [FromQuery] string? to,
+        [FromQuery] int     count   = 5,
+        [FromQuery] double  maxRisk = 0.3)
+    {
+        ParseAndValidate(destination, from, to, out var dest, out var fromDt, out var toDt);
+        var debris  = RequireCache();
+        var windows = calculator.Calculate(dest, fromDt, toDt, debris);
+
+        var best = windows
+            .Where(w => w.RiskScore <= maxRisk)
+            .OrderBy(w => w.RiskScore)
+            .Take(Math.Min(count, 20))
+            .Select((w, i) => new BestWindowDto(
+                i + 1,
+                w.Start.ToString("O"), w.End.ToString("O"),
+                w.RiskScore, w.DeltaVKmS, w.DurationHours,
+                w.Conjunctions
+                    .Select(c => new ConjunctionDto(
+                        c.DebrisId, c.DebrisName,
+                        c.ClosestApproachKm,
+                        c.TimeOfClosestApproach.ToString("O"),
+                        c.RiskLevel.ToString().ToLowerInvariant()))
+                    .ToList()))
+            .ToList();
+
+        return Ok(new
+        {
+            destination  = dest.DisplayName,
+            from         = fromDt.ToString("O"),
+            to           = toDt.ToString("O"),
+            best_windows = best
+        });
+    }
+
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    private IReadOnlyList<OrbitalObject> RequireCache()
+    {
+        if (!cache.IsReady)
+            throw new DomainException("CACHE_NOT_READY", "Orbital data is still loading.", 503);
+        return cache.GetAll();
+    }
+
+    private static void ParseAndValidate(
+        string? dest, string? from, string? to,
+        out MissionDestination destination,
+        out DateTime fromDt, out DateTime toDt)
+    {
+        if (string.IsNullOrEmpty(dest))
+            throw new DomainException("MISSING_PARAMETER", "'destination' is required.", 400);
+        if (string.IsNullOrEmpty(from))
+            throw new DomainException("MISSING_PARAMETER", "'from' is required.", 400);
+        if (string.IsNullOrEmpty(to))
+            throw new DomainException("MISSING_PARAMETER", "'to' is required.", 400);
+
+        destination = KnownDestinations.FindById(dest)
+            ?? throw new DomainException("INVALID_DESTINATION",
+                $"Unknown destination: {dest}", 400);
+
+        if (!DateTime.TryParse(from, null,
+                System.Globalization.DateTimeStyles.RoundtripKind, out fromDt))
+            throw new DomainException("INVALID_DATE_FORMAT",
+                "'from' is not a valid ISO 8601 date.", 400);
+
+        if (!DateTime.TryParse(to, null,
+                System.Globalization.DateTimeStyles.RoundtripKind, out toDt))
+            throw new DomainException("INVALID_DATE_FORMAT",
+                "'to' is not a valid ISO 8601 date.", 400);
+
+        fromDt = fromDt.ToUniversalTime();
+        toDt   = toDt.ToUniversalTime();
+
+        if ((toDt - fromDt).TotalHours > 48)
+            throw new DomainException("TIME_RANGE_EXCEEDED",
+                "Range cannot exceed 48 hours.", 400);
+    }
+}
+```
+
+### Task 5.2 — MissionController
+
+**Files:** `MissionClear.Api/Controllers/MissionController.cs`
+
+Route: `api/mission` — all endpoints public (save_to_history requires optional auth at service level)
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Dtos.Mission;
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class MissionController(
+    IMissionSimulationService simulation) : BaseApiController
+{
+    // POST api/mission/simulate — public
+    [HttpPost("simulate")]
+    public async Task<IActionResult> Simulate(
+        [FromBody] SimulateRequest request,
+        CancellationToken ct)
+    {
+        var result = await simulation.SimulateAsync(request, ct);
+        return Ok(result);
+    }
+
+    // POST api/mission/session — public
+    [HttpPost("session")]
+    public async Task<IActionResult> CreateSession(
+        [FromBody] SessionRequest request,
+        CancellationToken ct)
+    {
+        var result = await simulation.CreateSessionAsync(request, ct);
+        return StatusCode(201, result);
+    }
+
+    // GET api/mission/session/{sessionId}/stream — public (SSE)
+    [HttpGet("session/{sessionId}/stream")]
+    public async Task StreamSession(
+        string sessionId,
+        [FromServices] IMissionSseService sseService,
+        CancellationToken ct)
+    {
+        Response.Headers["Content-Type"]      = "text/event-stream";
+        Response.Headers["Cache-Control"]     = "no-cache";
+        Response.Headers["Connection"]        = "keep-alive";
+        Response.Headers["X-Accel-Buffering"] = "no";
+
+        await sseService.StreamAsync(sessionId, Response, ct);
+    }
+
+    // POST api/mission/session/{sessionId}/complete — optional auth
+    [HttpPost("session/{sessionId}/complete")]
+    public async Task<IActionResult> CompleteSession(
+        string sessionId,
+        [FromBody] CompleteSessionRequest request,
+        CancellationToken ct)
+    {
+        Guid? userId = IsAuthenticated ? CurrentUserId : null;
+        var result = await simulation.CompleteSessionAsync(sessionId, request, userId, ct);
+        return Ok(result);
+    }
+}
+```
+
+- [ ] Commit: `feat(controllers): LaunchWindowsController + MissionController`
+
+---
+
+## Phase 6: History & Dashboard Controllers
+
+### Task 6.1 — MissionsController
+
+**Files:** `MissionClear.Api/Controllers/MissionsController.cs`
+
+Route: `api/missions` — all endpoints require `[Authorize]`. DELETE requires `Administrator` role.
+
+**CRITICAL:** `[HttpGet("stats")]` MUST be declared before `[HttpGet("{id}")]` in source to prevent routing ambiguity.
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace MissionClear.Api.Controllers;
+
+[Authorize]
+public sealed class MissionsController(
+    IMissionHistoryService historyService) : BaseApiController
+{
+    // GET api/missions — any authenticated role
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] int     page        = 1,
+        [FromQuery] int     limit       = 20,
+        [FromQuery] string? status      = null,
+        [FromQuery] string? destination = null,
+        [FromQuery] string  sort        = "created_at_desc",
+        CancellationToken   ct          = default)
+    {
+        limit = Math.Min(limit, 50);
+        var result = await historyService.GetMissionsAsync(
+            CurrentUserId, page, limit, status, destination, sort, ct);
+        return Ok(result);
+    }
+
+    // GET api/missions/stats — MUST be before {id} route
+    [HttpGet("stats")]
+    public async Task<IActionResult> GetStats(CancellationToken ct)
+    {
+        var result = await historyService.GetStatsAsync(CurrentUserId, ct);
+        return Ok(result);
+    }
+
+    // GET api/missions/{id}
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(string id, CancellationToken ct)
+    {
+        if (!Guid.TryParse(id.Replace("msn_", ""), out var guid))
+            return BadRequest(new { error = "INVALID_ID", message = "Invalid mission ID format." });
+
+        var result = await historyService.GetMissionDetailAsync(guid, CurrentUserId, ct);
+        return Ok(result);
+    }
+
+    // DELETE api/missions/{id} — Administrator role only
+    [HttpDelete("{id}")]
+    [Authorize(Roles = "Administrator")]
+    public async Task<IActionResult> Delete(string id, CancellationToken ct)
+    {
+        if (!Guid.TryParse(id.Replace("msn_", ""), out var guid))
+            return BadRequest(new { error = "INVALID_ID", message = "Invalid mission ID format." });
+
+        await historyService.DeleteMissionAsync(guid, CurrentUserId, ct);
+        return NoContent();
+    }
+}
+```
+
+### Task 6.2 — DashboardController
+
+**Files:** `MissionClear.Api/Controllers/DashboardController.cs`
+
+Route: `api/dashboard` — public (optional auth on summary)
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Services.Interfaces;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.IdentityModel.JsonWebTokens;
+using System.Security.Claims;
+
+namespace MissionClear.Api.Controllers;
+
+public sealed class DashboardController(
+    IDashboardService dashboardService) : BaseApiController
+{
+    // GET api/dashboard/summary — optional auth
+    // Without token: user section is null
+    // With token: user section populated (display_name patched from JWT claims)
+    [HttpGet("summary")]
+    public async Task<IActionResult> GetSummary(CancellationToken ct)
+    {
+        Guid? userId = null;
+        string? displayName = null;
+        if (User.Identity?.IsAuthenticated == true)
+        {
+            var sub = User.FindFirst(JwtRegisteredClaimNames.Sub)?.Value
+                      ?? User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (Guid.TryParse(sub, out var uid))
+                userId = uid;
+            displayName = User.FindFirst("display_name")?.Value;
+        }
+
+        var result = await dashboardService.GetSummaryAsync(userId, ct);
+
+        // Patch display_name from JWT claims if available
+        if (displayName != null && result.User != null)
+        {
+            // Since record is immutable, reconstruct UserDashboardDto with correct name
+            var patchedUser = result.User with { DisplayName = displayName };
+            result = result with { User = patchedUser };
+        }
+
+        return Ok(result);
+    }
+
+    // GET api/dashboard/alerts — public
+    [HttpGet("alerts")]
+    public async Task<IActionResult> GetAlerts(
+        [FromQuery] int    windowHours = 6,
+        [FromQuery] string minRisk     = "medium",
+        CancellationToken  ct          = default)
+    {
+        windowHours = Math.Clamp(windowHours, 1, 24);
+        var result = await dashboardService.GetAlertsAsync(windowHours, minRisk, ct);
+        return Ok(result);
+    }
+}
+```
+
+- [ ] Commit: `feat(controllers): MissionsController (role-based) + DashboardController`
+
+---
+
+## Phase 7: Integration Tests
+
+### Task 7.1 — Add NuGet package
+
+**Files:** `MissionClear.Tests/MissionClear.Tests.csproj`
+
+- [ ] Adicionar referência ao pacote de testing
+
+```xml
+<PackageReference Include="Microsoft.AspNetCore.Mvc.Testing" Version="8.*" />
+```
+
+### Task 7.2 — appsettings.Testing.json
+
+**Files:** `MissionClear.Api/appsettings.Testing.json`
+
+- [ ] Criar arquivo (copiado ao output via csproj ou ConfigureAppConfiguration)
+
+```json
+{
+  "Jwt": {
+    "Secret": "test-secret-key-with-at-least-32-characters-long!!",
+    "Issuer": "mission-clear-api-test",
+    "Audience": "mission-clear-mobile-test",
+    "AccessTokenMinutes": 15,
+    "RefreshTokenDays": 7
+  },
+  "KeepTrack": {
+    "ApiKey": ""
+  }
+}
+```
+
+### Task 7.3 — TestWebApplicationFactory
+
+**Files:** `MissionClear.Tests/Integration/TestWebApplicationFactory.cs`
+
+- [ ] Criar arquivo
+
+```csharp
+using MissionClear.Api.Data;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using MissionClear.Api.Data;
 
-namespace MissionClear.Tests.Controllers;
+namespace MissionClear.Tests.Integration;
 
 public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
 {
@@ -831,11 +1013,12 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
     {
         builder.UseEnvironment("Testing");
 
-        builder.ConfigureAppConfiguration((ctx, config) =>
+        // Inject test configuration — must satisfy startup guard (Jwt:Secret >= 32 chars)
+        builder.ConfigureAppConfiguration((_, config) =>
         {
             config.AddInMemoryCollection(new Dictionary<string, string?>
             {
-                ["Jwt:Secret"]             = "test-secret-key-with-at-least-32-characters-long",
+                ["Jwt:Secret"]             = "test-secret-key-with-at-least-32-characters-long!!",
                 ["Jwt:Issuer"]             = "mission-clear-api-test",
                 ["Jwt:Audience"]           = "mission-clear-mobile-test",
                 ["Jwt:AccessTokenMinutes"] = "15",
@@ -846,299 +1029,340 @@ public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
 
         builder.ConfigureServices(services =>
         {
-            var descriptor = services.SingleOrDefault(d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
-            if (descriptor != null) services.Remove(descriptor);
+            // Replace MySQL DbContext with InMemory for tests
+            var descriptor = services.SingleOrDefault(
+                d => d.ServiceType == typeof(DbContextOptions<AppDbContext>));
+            if (descriptor != null)
+                services.Remove(descriptor);
 
             services.AddDbContext<AppDbContext>(options =>
-                options.UseInMemoryDatabase($"TestDb-{Guid.NewGuid()}"));
+                options.UseInMemoryDatabase($"TestDb_{Guid.NewGuid()}"));
         });
     }
 }
 ```
 
-#### Task 6.3: AuthControllerTests
+### Task 7.4 — AuthEndpointTests
 
-- [ ] Create `MissionClear.Tests/Controllers/AuthControllerTests.cs`
+**Files:** `MissionClear.Tests/Integration/AuthEndpointTests.cs`
+
+- [ ] Criar arquivo
 
 ```csharp
 using System.Net;
 using System.Net.Http.Json;
 using FluentAssertions;
-using MissionClear.Api.Dtos;
+using MissionClear.Api.Dtos.Auth;
 using Xunit;
 
-namespace MissionClear.Tests.Controllers;
+namespace MissionClear.Tests.Integration;
 
-public sealed class AuthControllerTests : IClassFixture<TestWebApplicationFactory>
+public sealed class AuthEndpointTests(TestWebApplicationFactory factory)
+    : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly TestWebApplicationFactory _factory;
-    public AuthControllerTests(TestWebApplicationFactory factory) => _factory = factory;
-
-    private static AuthRegisterRequest NewUser(string email = "pilot@test.com") =>
-        new(email, "StrongPass23!", "Test Pilot");
+    private readonly HttpClient _client = factory.CreateClient();
 
     [Fact]
-    public async Task Register_WithValidData_Returns201AndAccessToken()
+    public async Task Register_Returns201_WithResearcherRole()
     {
-        var client = _factory.CreateClient();
-        var response = await client.PostAsJsonAsync("/api/auth/register", NewUser("new1@test.com"));
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email        = $"{Guid.NewGuid():N}@test.com",
+            password     = "Test@Pass1",
+            display_name = "New User"
+        });
 
         response.StatusCode.Should().Be(HttpStatusCode.Created);
+
         var body = await response.Content.ReadFromJsonAsync<AuthResponse>();
-        body!.AccessToken.Should().NotBeNullOrWhiteSpace();
+        body!.User.Role.Should().Be("Researcher");
+        body.AccessToken.Should().NotBeNullOrWhiteSpace();
+        body.RefreshToken.Should().NotBeNullOrWhiteSpace();
     }
 
     [Fact]
-    public async Task Register_WithDuplicateEmail_Returns409()
+    public async Task Register_Returns409_WhenEmailDuplicate()
     {
-        var client = _factory.CreateClient();
-        var payload = NewUser("dup@test.com");
+        var email = $"{Guid.NewGuid():N}@test.com";
+        var payload = new { email, password = "Test@Pass1", display_name = "Dup" };
 
-        await client.PostAsJsonAsync("/api/auth/register", payload);
-        var second = await client.PostAsJsonAsync("/api/auth/register", payload);
+        await _client.PostAsJsonAsync("/api/auth/register", payload);
+        var second = await _client.PostAsJsonAsync("/api/auth/register", payload);
 
         second.StatusCode.Should().Be(HttpStatusCode.Conflict);
     }
 
     [Fact]
-    public async Task Register_WithWeakPassword_Returns400()
+    public async Task Login_Returns401_WithWrongPassword()
     {
-        var client = _factory.CreateClient();
-        var weak = new AuthRegisterRequest("weak@test.com", "123", "Weak");
-        var response = await client.PostAsJsonAsync("/api/auth/register", weak);
+        var email = $"{Guid.NewGuid():N}@test.com";
+        await _client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "Test@Pass1", display_name = "User" });
 
-        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
-    }
+        var response = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Wrong@Pass1" });
 
-    [Fact]
-    public async Task Login_WithCorrectCredentials_Returns200()
-    {
-        var client = _factory.CreateClient();
-        var payload = NewUser("login@test.com");
-        await client.PostAsJsonAsync("/api/auth/register", payload);
-
-        var login = await client.PostAsJsonAsync("/api/auth/login",
-            new AuthLoginRequest(payload.Email, payload.Password));
-
-        login.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task Login_WithWrongPassword_Returns401()
-    {
-        var client = _factory.CreateClient();
-        var payload = NewUser("wrong@test.com");
-        await client.PostAsJsonAsync("/api/auth/register", payload);
-
-        var login = await client.PostAsJsonAsync("/api/auth/login",
-            new AuthLoginRequest(payload.Email, "WrongPass9!"));
-
-        login.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task Refresh_WithValidRefreshToken_Returns200()
-    {
-        var client = _factory.CreateClient();
-        var payload = NewUser("refresh@test.com");
-        var reg = await client.PostAsJsonAsync("/api/auth/register", payload);
-        var auth = await reg.Content.ReadFromJsonAsync<AuthResponse>();
-
-        var refresh = await client.PostAsJsonAsync("/api/auth/refresh",
-            new AuthRefreshRequest(auth!.RefreshToken));
-
-        refresh.StatusCode.Should().Be(HttpStatusCode.OK);
-        var refreshed = await refresh.Content.ReadFromJsonAsync<AuthResponse>();
-        refreshed!.AccessToken.Should().NotBeNullOrWhiteSpace();
-    }
-
-    [Fact]
-    public async Task Logout_WithoutAuth_Returns401()
-    {
-        var client = _factory.CreateClient();
-        var response = await client.PostAsync("/api/auth/logout", null);
         response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
     }
 
     [Fact]
-    public async Task Logout_WithAuth_Returns204()
+    public async Task Login_Returns200_WithCorrectCredentials()
     {
-        var client = _factory.CreateClient();
-        var payload = NewUser("logout@test.com");
-        var reg = await client.PostAsJsonAsync("/api/auth/register", payload);
-        var auth = await reg.Content.ReadFromJsonAsync<AuthResponse>();
+        var email = $"{Guid.NewGuid():N}@test.com";
+        await _client.PostAsJsonAsync("/api/auth/register",
+            new { email, password = "Test@Pass1", display_name = "User" });
 
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
+        var response = await _client.PostAsJsonAsync("/api/auth/login",
+            new { email, password = "Test@Pass1" });
 
-        var response = await client.PostAsync("/api/auth/logout", null);
-        response.StatusCode.Should().Be(HttpStatusCode.NoContent);
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
     }
 }
 ```
 
-#### Task 6.4: DebrisControllerTests
+### Task 7.5 — MissionsAuthorizationTests
 
-- [ ] Create `MissionClear.Tests/Controllers/DebrisControllerTests.cs`
+**Files:** `MissionClear.Tests/Integration/MissionsAuthorizationTests.cs`
+
+- [ ] Criar arquivo
+
+```csharp
+using System.Net;
+using System.Net.Http.Headers;
+using System.Net.Http.Json;
+using FluentAssertions;
+using MissionClear.Api.Dtos.Auth;
+using Xunit;
+
+namespace MissionClear.Tests.Integration;
+
+public sealed class MissionsAuthorizationTests(TestWebApplicationFactory factory)
+    : IClassFixture<TestWebApplicationFactory>
+{
+    private readonly HttpClient _client = factory.CreateClient();
+
+    private async Task<string> RegisterAndGetTokenAsync(string role = "Researcher")
+    {
+        var email    = $"{Guid.NewGuid():N}@test.com";
+        var response = await _client.PostAsJsonAsync("/api/auth/register", new
+        {
+            email,
+            password     = "Test@Pass1",
+            display_name = "Test User",
+            role          // service must accept role hint; otherwise all users are Researcher
+        });
+        var auth = await response.Content.ReadFromJsonAsync<AuthResponse>();
+        return auth!.AccessToken;
+    }
+
+    [Fact]
+    public async Task GetMissions_Returns401_WithoutToken()
+    {
+        var response = await _client.GetAsync("/api/missions");
+        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
+    }
+
+    [Fact]
+    public async Task GetMissions_Returns200_WithValidToken()
+    {
+        var token = await RegisterAndGetTokenAsync();
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.GetAsync("/api/missions");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetMissionStats_Returns200_WithValidToken()
+    {
+        var token = await RegisterAndGetTokenAsync();
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        var response = await _client.GetAsync("/api/missions/stats");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task DeleteMission_Returns403_ForResearcher()
+    {
+        // Researcher role does not have Administrator — must receive 403
+        var token = await RegisterAndGetTokenAsync("Researcher");
+        _client.DefaultRequestHeaders.Authorization =
+            new AuthenticationHeaderValue("Bearer", token);
+
+        // Non-existent mission ID is fine — auth check happens before DB lookup
+        var response = await _client.DeleteAsync(
+            "/api/missions/msn_00000000000000000000000000000001");
+
+        response.StatusCode.Should().Be(HttpStatusCode.Forbidden);
+    }
+}
+```
+
+### Task 7.6 — StatusEndpointTests
+
+**Files:** `MissionClear.Tests/Integration/StatusEndpointTests.cs`
+
+- [ ] Criar arquivo
 
 ```csharp
 using System.Net;
 using FluentAssertions;
 using Xunit;
 
-namespace MissionClear.Tests.Controllers;
+namespace MissionClear.Tests.Integration;
 
-public sealed class DebrisControllerTests : IClassFixture<TestWebApplicationFactory>
+public sealed class StatusEndpointTests(TestWebApplicationFactory factory)
+    : IClassFixture<TestWebApplicationFactory>
 {
-    private readonly TestWebApplicationFactory _factory;
-    public DebrisControllerTests(TestWebApplicationFactory factory) => _factory = factory;
+    private readonly HttpClient _client = factory.CreateClient();
+
+    [Fact]
+    public async Task GetStatus_Returns200_Always()
+    {
+        var response = await _client.GetAsync("/api/status");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task GetDestinations_Returns200_WithList()
+    {
+        var response = await _client.GetAsync("/api/destinations");
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+    }
 
     [Fact]
     public async Task GetDebris_WhenCacheNotReady_Returns503()
     {
-        // Test factory starts with empty cache → IsReady = false
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/debris");
+        // Factory starts with empty cache → IsReady = false → CACHE_NOT_READY
+        var response = await _client.GetAsync("/api/debris");
         response.StatusCode.Should().Be(HttpStatusCode.ServiceUnavailable);
     }
-
-    [Fact]
-    public async Task GetStatus_AlwaysReturns200()
-    {
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/status");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task GetDestinations_Returns200WithList()
-    {
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/destinations");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
 }
 ```
 
-#### Task 6.5: MissionsControllerTests
-
-- [ ] Create `MissionClear.Tests/Controllers/MissionsControllerTests.cs`
-
-```csharp
-using System.Net;
-using System.Net.Http.Json;
-using FluentAssertions;
-using MissionClear.Api.Dtos;
-using Xunit;
-
-namespace MissionClear.Tests.Controllers;
-
-public sealed class MissionsControllerTests : IClassFixture<TestWebApplicationFactory>
-{
-    private readonly TestWebApplicationFactory _factory;
-    public MissionsControllerTests(TestWebApplicationFactory factory) => _factory = factory;
-
-    [Fact]
-    public async Task ListMissions_WithoutToken_Returns401()
-    {
-        var client = _factory.CreateClient();
-        var response = await client.GetAsync("/api/missions");
-        response.StatusCode.Should().Be(HttpStatusCode.Unauthorized);
-    }
-
-    [Fact]
-    public async Task ListMissions_WithToken_Returns200WithPagination()
-    {
-        var client = _factory.CreateClient();
-        var reg = await client.PostAsJsonAsync("/api/auth/register",
-            new AuthRegisterRequest("history@test.com", "StrongPass23!", "History Tester"));
-        var auth = await reg.Content.ReadFromJsonAsync<AuthResponse>();
-
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        var response = await client.GetAsync("/api/missions?page=1&limit=10");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-
-    [Fact]
-    public async Task GetMissionStats_WithToken_Returns200()
-    {
-        var client = _factory.CreateClient();
-        var reg = await client.PostAsJsonAsync("/api/auth/register",
-            new AuthRegisterRequest("stats@test.com", "StrongPass23!", "Stats Tester"));
-        var auth = await reg.Content.ReadFromJsonAsync<AuthResponse>();
-
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", auth!.AccessToken);
-
-        var response = await client.GetAsync("/api/missions/stats");
-        response.StatusCode.Should().Be(HttpStatusCode.OK);
-    }
-}
-```
-
-- [ ] Commit: `test(controllers): integration tests for auth + debris + missions`
+- [ ] Commit: `test(controllers): integration tests — auth, authorization, status`
 
 ---
 
-### Phase 7: Final Wiring & Verification
+## Phase 8: Final Verification
 
-#### Task 7.1: Program.cs final state
+### Task 8.1 — Build & Test
 
-```csharp
-// Critical ordering:
-app.UseMiddleware<GlobalExceptionMiddleware>();
-app.UseCors("MobileApp");
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
+- [ ] Verificar build limpo (zero warnings, zero errors)
+
+```powershell
+dotnet build MissionClear.sln
 ```
 
-- [ ] Expose `public partial class Program {}` at end of `Program.cs` for `WebApplicationFactory<Program>`
-- [ ] Verify CORS allows `*` in Development, mobile origin in Production
-- [ ] `dotnet build` — 0 warnings, 0 errors
-- [ ] `dotnet test` — all tests green
+- [ ] Rodar todos os testes
 
-- [ ] Commit: `chore(api): final wiring + smoke verification`
+```powershell
+dotnet test MissionClear.Tests/MissionClear.Tests.csproj -v normal
+```
+
+- [ ] Rodar apenas testes de integração
+
+```powershell
+dotnet test MissionClear.Tests/MissionClear.Tests.csproj --filter "Integration" -v normal
+```
+
+### Task 8.2 — Middleware pipeline verification
+
+Confirmar ordem no `Program.cs`:
+
+```
+app.UseMiddleware<GlobalExceptionMiddleware>();   ← 1st
+app.UseCors("MobileApp");                         ← 2nd
+app.UseAuthentication();                          ← 3rd
+app.UseAuthorization();                           ← 4th
+app.MapControllers();                             ← 5th
+app.MapDefaultEndpoints();                        ← Aspire health
+```
+
+### Task 8.3 — Route order verification
+
+Em `MissionsController.cs`, confirmar que `[HttpGet("stats")]` aparece textualmente ANTES de `[HttpGet("{id}")]` no arquivo fonte.
+
+### Task 8.4 — Final commit
+
+```powershell
+git add MissionClear.Api/Controllers/ `
+        MissionClear.Api/Program.cs `
+        MissionClear.Api/Middleware/ `
+        MissionClear.Tests/Integration/
+git commit -m "feat(controllers): all 9 controllers, JWT role auth, Administrator-only DELETE"
+```
 
 ---
 
-## Testing Strategy
+## Authorization Matrix
 
-- **Unit tests:** covered in plans 03-06 (services)
-- **Integration tests:** `WebApplicationFactory` + InMemory DB — auth flow, protected routes, 503 on cache empty
-- **Manual smoke tests:** curl against running API (status, register, login, debris)
-- **Coverage target:** 80%+ on Services; controllers validated via integration
+| Endpoint | Method | Auth Required | Role |
+|---|---|---|---|
+| `/api/auth/register` | POST | No | — |
+| `/api/auth/login` | POST | No | — |
+| `/api/auth/refresh` | POST | No | — |
+| `/api/auth/logout` | POST | Yes | Any |
+| `/api/users/me` | GET | Yes | Any |
+| `/api/users/me` | PUT | Yes | Any |
+| `/api/status` | GET | No | — |
+| `/api/destinations` | GET | No | — |
+| `/api/debris` | GET | No | — |
+| `/api/debris/stats` | GET | No | — |
+| `/api/debris/{id}` | GET | No | — |
+| `/api/launch-windows` | GET | No | — |
+| `/api/launch-windows/best` | GET | No | — |
+| `/api/mission/simulate` | POST | No | — |
+| `/api/mission/session` | POST | No | — |
+| `/api/mission/session/{id}/stream` | GET | No | — |
+| `/api/mission/session/{id}/complete` | POST | Optional | — |
+| `/api/missions` | GET | Yes | Any |
+| `/api/missions/stats` | GET | Yes | Any |
+| `/api/missions/{id}` | GET | Yes | Any |
+| `/api/missions/{id}` | DELETE | Yes | **Administrator** |
+| `/api/dashboard/summary` | GET | Optional | — |
+| `/api/dashboard/alerts` | GET | No | — |
+
+---
 
 ## Risks & Mitigations
 
 | Risk | Severity | Mitigation |
-|------|----------|------------|
-| Route `/missions/stats` matched as id | HIGH | Declare `[HttpGet("stats")]` BEFORE `[HttpGet("{id}")]` in controller source |
-| SSE buffered by reverse proxy | MEDIUM | Set `X-Accel-Buffering: no` header |
-| Global middleware swallowing errors in dev | MEDIUM | Branch on `IHostEnvironment.IsProduction()` |
-| InMemory DB doesn't enforce unique constraints | MEDIUM | Duplicate email check in service layer |
-| `Program` not visible to test project | HIGH | Add `public partial class Program {}` at bottom of `Program.cs` |
-| Claim name mismatch (`sub` vs `NameIdentifier`) | HIGH | `GetUserId()` checks both |
-| CORS misconfig blocks Mobile | MEDIUM | Validate `CorsAllowedOrigins` at startup; fail fast if empty in Production |
+|---|---|---|
+| `/missions/stats` matched as `{id}` | HIGH | `[HttpGet("stats")]` declared first in source; test verifies 200 not 404 |
+| Startup fails when Aspire MySQL not available | HIGH | InMemory DB in Testing env; `AddMySqlDbContext` is Aspire-only |
+| `Program` not visible to test project | HIGH | `public partial class Program {}` at end of `Program.cs` |
+| Claim mismatch (`sub` vs `NameIdentifier`) | HIGH | `BaseApiController.CurrentUserId` checks both |
+| Stack trace in error response | HIGH | `GlobalExceptionMiddleware` catches all — never serializes `ex.StackTrace` |
+| SSE buffered by reverse proxy | MEDIUM | `X-Accel-Buffering: no` + `Connection: keep-alive` headers |
+| CORS blocks Mobile in production | MEDIUM | Startup guard: log warning if `AllowedOrigins` is empty in non-Development |
+| InMemory DB lacks unique constraints | MEDIUM | Duplicate email check in `AuthService.RegisterAsync`, not DB |
+| `DeleteMissionAsync` called without admin check at service | MEDIUM | Both `[Authorize(Roles="Administrator")]` on controller AND service-level ownership check |
+
+---
 
 ## Success Criteria
 
 - [ ] All 23 routes implemented and reachable
-- [ ] Zero business logic in controllers
+- [ ] Zero business logic in controllers — all delegation to services
 - [ ] All controllers extend `BaseApiController`
-- [ ] `DomainException` handled uniformly via `DomainError()` helper
-- [ ] `GlobalExceptionMiddleware` registered and tested
-- [ ] `[Authorize]` enforced on all protected routes
-- [ ] `/api/missions/stats` resolves before `/api/missions/{id}`
-- [ ] SSE endpoint sets correct headers and delegates to `MissionSseService`
-- [ ] Integration tests pass: 14+ scenarios
-- [ ] No stack traces in production responses
-- [ ] `dotnet build` clean (zero warnings)
-- [ ] `dotnet test` green
-- [ ] 6 commits with conventional format
+- [ ] `GlobalExceptionMiddleware` catches `DomainException` with correct HTTP status from exception
+- [ ] `GlobalExceptionMiddleware` never exposes stack traces
+- [ ] `[Authorize(Roles = "Administrator")]` on `DELETE /api/missions/{id}`
+- [ ] `GET /api/missions`, `GET /api/missions/stats`, `GET /api/missions/{id}` → `[Authorize]` any role
+- [ ] `/api/missions/stats` route declared before `{id}` in source file
+- [ ] SSE endpoint sets `text/event-stream`, `X-Accel-Buffering: no`
+- [ ] `public partial class Program {}` at end of `Program.cs`
+- [ ] `builder.AddMySqlDbContext<AppDbContext>("missionclear")` in Program.cs
+- [ ] `app.MapDefaultEndpoints()` in Program.cs
+- [ ] Auto-migrate runs on startup
+- [ ] Integration tests pass: register→201+Researcher role, duplicate→409, wrong password→401, GET /missions without token→401, GET /missions with token→200, DELETE as Researcher→403, GET stats→200, GET /api/status→200
+- [ ] `dotnet build` — 0 warnings, 0 errors
+- [ ] `dotnet test` — all tests green
 
 ---
 
-**This is the final plan. Plans 00-07 fully cover the Mission Clear backend.**
+**This is the definitive plan for Phase 07. Plans 00–07 + Phase 08 (MVC Web) fully cover the Mission Clear backend.**

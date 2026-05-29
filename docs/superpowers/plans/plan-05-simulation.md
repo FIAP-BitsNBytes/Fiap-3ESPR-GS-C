@@ -1,1041 +1,1283 @@
-# Implementation Plan: Mission Simulation Services (Plan-05)
+# Implementation Plan: Phase 05 — Simulation Services
 
-## Overview
-Implements the mission simulation layer of the Mission Clear backend: conjunction detection (debris proximity to mission trajectory), launch window calculation (15-minute risk-scored slots), full mission simulation (trajectory + score), in-memory session store, and SSE streaming for real-time telemetry. All services follow strict TDD and feed the `/api/mission/*` and `/api/launch-windows*` controllers (built in plan-07).
+> **For agentic workers:** REQUIRED SUB-SKILL: `superpowers:executing-plans`
+>
+> This is the **definitive source of truth** for Phase 05. It supersedes all previous versions
+> and the stub in `reboot/phase-05-simulation.md`. Implement every step in order; do not skip.
 
-## Requirements
-- ASP.NET Core 8 (no external dependencies beyond what plan-03 already added)
-- Domain types from plan-02 (`OrbitalObject`, `ConjunctionResult`, `LaunchWindow`, `MissionSession`, `SessionStatus`, `RiskLevel`)
-- `IOrbitalCache` / `OrbitalEngineService` (plan-03) available — consumed only via injection at controller layer, services here receive `IReadOnlyList<OrbitalObject>` as input
-- `KnownDestinations` registry (plan-02): `ISS`, `Hubble`, `Tiangong`, etc., each with `LatitudeDeg`, `LongitudeDeg`, `AltitudeKm`, `DeltaVKmS`, `MissionDurationHours`
-- `RiskLevelClassifier.Classify(double km)` static helper (plan-02)
-- Test framework: xUnit + FluentAssertions (already in `MissionClear.Tests`)
-- Coverage target: 80%+ on Services
+**Goal:** Implement the full simulation layer: ConjunctionDetector, LaunchWindowCalculator,
+MissionSimulationService (with session management), SessionStore, and MissionSseService.
 
-## Architecture Changes
+**Dependencies (must be completed before this phase):**
+- Phase 02 — Models + DTOs: `OrbitalObject`, `MissionDestination`, `KnownDestinations`,
+  `ConjunctionResult`, `LaunchWindow`, `MissionSession`, `RiskLevel` exist in
+  `MissionClear.Api/Models/` with namespace `MissionClear.Api.Models`
+- Phase 03 — Orbital Engine: `IOrbitalCache` available, `OrbitalMath.HaversineKm`,
+  `RiskScoring.Classify`, `RiskScoring.ComputeScore`, `MissionScoring.Compute` in `Helpers/`
+- Phase 04 — Auth: `IMissionHistoryService` available in `Services/Interfaces/`
+- Test framework: xUnit + FluentAssertions in `MissionClear.Tests`
+
+**Algorithms (immutable — do not alter):**
+
+```
+risk_score = min(1.0, sum of contributions per debris)
+  contribution = max(0, 1 - (d - 25) / (200 - 25))  where d = closest_approach_km
+
+mission_score = (int)(efficiency + safety)
+  efficiency = max(0, 1 - deltaV / 12) * 50
+  safety     = (1 - risk_score) * 50
+
+RiskLevel thresholds (Haversine 3D distance):
+  < 1 km   → Critical
+  < 5 km   → High
+  < 10 km  → Medium
+  otherwise → Low
+```
+
+These are already implemented in `Helpers/RiskScoring.cs` and `Helpers/MissionScoring.cs`.
+Use them; never re-implement them inline.
+
+---
+
+## Architecture
 
 ```
 MissionClear.Api/
-├── Interfaces/
-│   ├── IConjunctionDetector.cs
-│   ├── ILaunchWindowCalculator.cs
-│   └── IMissionSimulationService.cs
 ├── Services/
-│   ├── ConjunctionDetector.cs
-│   ├── LaunchWindowCalculator.cs
-│   ├── MissionSimulationService.cs
-│   ├── SessionStore.cs
-│   ├── SessionStoreOptions.cs
-│   └── MissionSseService.cs
-└── Program.cs (DI registration additions)
+│   ├── Interfaces/
+│   │   ├── IConjunctionDetector.cs       ← new
+│   │   ├── ILaunchWindowCalculator.cs    ← new
+│   │   ├── IMissionSimulationService.cs  ← new
+│   │   ├── ISessionStore.cs              ← new
+│   │   └── IMissionSseService.cs         ← new
+│   ├── ConjunctionDetector.cs            ← new
+│   ├── LaunchWindowCalculator.cs         ← new
+│   ├── MissionSimulationService.cs       ← new
+│   ├── SessionStore.cs                   ← new
+│   └── MissionSseService.cs              ← new
+└── Program.cs                            ← add DI registrations
 
 MissionClear.Tests/
 └── Services/
-    ├── ConjunctionDetectorTests.cs
-    ├── LaunchWindowCalculatorTests.cs
-    ├── MissionSimulationServiceTests.cs
-    ├── SessionStoreTests.cs
-    └── MissionSseServiceTests.cs
+    ├── ConjunctionDetectorTests.cs       ← new
+    ├── LaunchWindowCalculatorTests.cs    ← new
+    ├── SessionStoreTests.cs              ← new
+    └── MissionSimulationServiceTests.cs  ← new
 ```
 
-> **Regra:** interfaces em `Interfaces/`, implementações em `Services/`. Nunca misturar.
+**Namespace rules:**
+- Interfaces: `namespace MissionClear.Api.Services.Interfaces;`
+- Implementations: `namespace MissionClear.Api.Services;` + `using MissionClear.Api.Services.Interfaces;`
+- Tests: `namespace MissionClear.Tests.Services;`
 
-> **Namespaces corretos:**
-> - Arquivos em `Interfaces/` → `namespace MissionClear.Api.Interfaces;`
-> - Arquivos em `Services/` → `namespace MissionClear.Api.Services;` + `using MissionClear.Api.Interfaces;`
-> - Os snippets de código neste plano usam o namespace de interface; nas implementações trocar para `MissionClear.Api.Services`.
-
-No new NuGet packages. No new configuration sections except `SessionStoreOptions` (TTL).
+**No new NuGet packages.** No new configuration sections except `OrbitalSettings.SessionTtlMinutes`
+(already in `OrbitalSettings`; add the property if missing with default `30`).
 
 ---
 
 ## Implementation Steps
 
-### Phase 1: ConjunctionDetector (commit 1)
+### Phase 1 — Service Interfaces (commit 1)
 
-1. **[ ] Write ConjunctionDetector tests (RED)** (`MissionClear.Tests/Services/ConjunctionDetectorTests.cs`)
-   - 6 tests covering empty input, no detections, Medium (50 km), High (3 km), Critical (0.5 km), outside-radius filter.
-   - Use `OrbitalObject` factory helper to place debris at a known lat/lon/alt relative to a mission point.
-   - Why: Lock in the 3D-distance contract before implementation.
-   - Dependencies: plan-02 domain types.
-   - Risk: Medium — Haversine math is easy to get wrong; tests must use precomputed expected distances.
+**1. [ ] Create all five interfaces**
 
-   ```csharp
-   using FluentAssertions;
-   using MissionClear.Api.Domain;
-   using MissionClear.Api.Services.Conjunctions;
-   using Xunit;
+`MissionClear.Api/Services/Interfaces/IConjunctionDetector.cs`:
+```csharp
+using MissionClear.Api.Models;
 
-   namespace MissionClear.Tests.Services;
+namespace MissionClear.Api.Services.Interfaces;
 
-   public class ConjunctionDetectorTests
-   {
-       private static OrbitalObject Debris(string id, double lat, double lon, double altKm) =>
-           new(id, $"DEB-{id}", "debris", lat, lon, altKm, 7.6, "celestrak", DateTime.UtcNow);
+public interface IConjunctionDetector
+{
+    IReadOnlyList<ConjunctionResult> Detect(
+        MissionDestination destination,
+        DateTime at,
+        IReadOnlyList<OrbitalObject> debris);
+}
+```
 
-       private readonly IConjunctionDetector _sut = new ConjunctionDetector();
+`MissionClear.Api/Services/Interfaces/ILaunchWindowCalculator.cs`:
+```csharp
+using MissionClear.Api.Models;
 
-       [Fact]
-       public void Returns_empty_when_debris_list_is_empty()
-       {
-           var result = _sut.Detect(Array.Empty<OrbitalObject>(), 0, 0, 400);
-           result.Should().BeEmpty();
-       }
+namespace MissionClear.Api.Services.Interfaces;
 
-       [Fact]
-       public void Returns_empty_when_no_debris_within_safe_radius()
-       {
-           var debris = new[] { Debris("1", 45.0, 45.0, 400) }; // far away
-           var result = _sut.Detect(debris, 0, 0, 400);
-           result.Should().BeEmpty();
-       }
+public interface ILaunchWindowCalculator
+{
+    IReadOnlyList<LaunchWindow> Calculate(
+        MissionDestination destination,
+        DateTime from,
+        DateTime to,
+        IReadOnlyList<OrbitalObject> debris);
+}
+```
 
-       [Fact]
-       public void Detects_debris_at_about_50km_as_medium_or_low()
-       {
-           // ~0.45 degrees latitude at 400km ≈ 50 km horizontal
-           var debris = new[] { Debris("med", 0.45, 0, 400) };
-           var result = _sut.Detect(debris, 0, 0, 400, safeRadiusKm: 200);
-           result.Should().HaveCount(1);
-           result[0].ClosestApproachKm.Should().BeInRange(45, 55);
-           result[0].Risk.Should().BeOneOf(RiskLevel.Low, RiskLevel.Medium);
-       }
+`MissionClear.Api/Services/Interfaces/IMissionSimulationService.cs`:
+```csharp
+using MissionClear.Api.Dtos.Mission;
 
-       [Fact]
-       public void Detects_debris_at_3km_as_high()
-       {
-           var debris = new[] { Debris("hi", 0, 0, 403) }; // 3 km vertical
-           var result = _sut.Detect(debris, 0, 0, 400);
-           result.Should().HaveCount(1);
-           result[0].ClosestApproachKm.Should().BeApproximately(3.0, 0.1);
-           result[0].Risk.Should().Be(RiskLevel.High);
-       }
+namespace MissionClear.Api.Services.Interfaces;
 
-       [Fact]
-       public void Detects_debris_at_half_km_as_critical()
-       {
-           var debris = new[] { Debris("crit", 0, 0, 400.5) };
-           var result = _sut.Detect(debris, 0, 0, 400);
-           result[0].Risk.Should().Be(RiskLevel.Critical);
-       }
+public interface IMissionSimulationService
+{
+    Task<SimulateResponse> SimulateAsync(SimulateRequest request, CancellationToken ct = default);
+    Task<SessionResponse> CreateSessionAsync(SessionRequest request, CancellationToken ct = default);
+    Task<CompleteSessionResponse> CompleteSessionAsync(
+        string sessionId,
+        CompleteSessionRequest request,
+        Guid? userId,
+        CancellationToken ct = default);
+}
+```
 
-       [Fact]
-       public void Ignores_debris_outside_safe_radius()
-       {
-           var debris = new[] { Debris("far", 0, 0, 700) }; // 300 km vertical
-           var result = _sut.Detect(debris, 0, 0, 400, safeRadiusKm: 200);
-           result.Should().BeEmpty();
-       }
-   }
-   ```
+`MissionClear.Api/Services/Interfaces/ISessionStore.cs`:
+```csharp
+using MissionClear.Api.Models;
 
-2. **[ ] Run tests — confirm RED** (all 6 fail with type-not-found)
+namespace MissionClear.Api.Services.Interfaces;
 
-3. **[ ] Implement IConjunctionDetector + ConjunctionDetector (GREEN)**
+public interface ISessionStore
+{
+    void Set(MissionSession session);
+    MissionSession? Get(string sessionId);
+    void Remove(string sessionId);
+    void PurgeExpired();
+}
+```
 
-   ```csharp
-   // IConjunctionDetector.cs
-   using MissionClear.Api.Domain;
+`MissionClear.Api/Services/Interfaces/IMissionSseService.cs`:
+```csharp
+using Microsoft.AspNetCore.Http;
 
-   namespace MissionClear.Api.Interfaces;
+namespace MissionClear.Api.Services.Interfaces;
 
-   public interface IConjunctionDetector
-   {
-       IReadOnlyList<ConjunctionResult> Detect(
-           IEnumerable<OrbitalObject> debris,
-           double missionLatDeg,
-           double missionLonDeg,
-           double missionAltKm,
-           double safeRadiusKm = 200.0);
-   }
-   ```
+public interface IMissionSseService
+{
+    Task StreamAsync(string sessionId, HttpResponse response, CancellationToken ct);
+}
+```
 
-   ```csharp
-   // ConjunctionDetector.cs
-   using MissionClear.Api.Domain;
+**2. [ ] Verify build: `dotnet build` — must succeed (interfaces compile, implementations not yet)**
 
-   namespace MissionClear.Api.Interfaces;
-
-   public sealed class ConjunctionDetector : IConjunctionDetector
-   {
-       private const double EarthRadiusKm = 6371.0;
-       private const double RelativeVelocityKmS = 14.0;
-
-       public IReadOnlyList<ConjunctionResult> Detect(
-           IEnumerable<OrbitalObject> debris,
-           double missionLatDeg,
-           double missionLonDeg,
-           double missionAltKm,
-           double safeRadiusKm = 200.0)
-       {
-           ArgumentNullException.ThrowIfNull(debris);
-           var now = DateTime.UtcNow;
-           var results = new List<ConjunctionResult>();
-
-           foreach (var obj in debris)
-           {
-               var avgAlt = (missionAltKm + obj.AltitudeKm) / 2.0;
-               var horizKm = HaversineKm(
-                   missionLatDeg, missionLonDeg,
-                   obj.LatitudeDeg, obj.LongitudeDeg,
-                   EarthRadiusKm + avgAlt);
-               var vertKm = Math.Abs(missionAltKm - obj.AltitudeKm);
-               var distance = Math.Sqrt(horizKm * horizKm + vertKm * vertKm);
-
-               if (distance >= safeRadiusKm) continue;
-
-               var etaMinutes = distance / RelativeVelocityKmS / 60.0;
-               results.Add(new ConjunctionResult(
-                   DebrisId: obj.NoradCatId,
-                   DebrisName: obj.Name,
-                   ClosestApproachKm: Math.Round(distance, 3),
-                   TimeOfClosestApproachUtc: now.AddMinutes(etaMinutes),
-                   Risk: RiskLevelClassifier.Classify(distance)));
-           }
-
-           return results;
-       }
-
-       private static double HaversineKm(double lat1, double lon1, double lat2, double lon2, double radiusKm)
-       {
-           var dLat = ToRad(lat2 - lat1);
-           var dLon = ToRad(lon2 - lon1);
-           var a = Math.Sin(dLat / 2) * Math.Sin(dLat / 2)
-                 + Math.Cos(ToRad(lat1)) * Math.Cos(ToRad(lat2))
-                 * Math.Sin(dLon / 2) * Math.Sin(dLon / 2);
-           var c = 2 * Math.Atan2(Math.Sqrt(a), Math.Sqrt(1 - a));
-           return radiusKm * c;
-       }
-
-       private static double ToRad(double deg) => deg * Math.PI / 180.0;
-   }
-   ```
-
-4. **[ ] Run tests — confirm GREEN**
-
-5. **[ ] Commit:** `feat(services): add ConjunctionDetector with Haversine 3D proximity`
+**3. [ ] Commit:** `feat(simulation): add service interfaces IConjunctionDetector, ILaunchWindowCalculator, IMissionSimulationService, ISessionStore, IMissionSseService`
 
 ---
 
-### Phase 2: LaunchWindowCalculator (commit 2)
+### Phase 2 — ConjunctionDetector (commit 2)
 
-6. **[ ] Write LaunchWindowCalculator tests (RED)** (`MissionClear.Tests/Services/LaunchWindowCalculatorTests.cs`)
-   - 6 tests: windows in range, sorted ascending, zero-risk window recommended, populated risk_score, maxWindows cap, invalid destination returns empty.
+**4. [ ] Write ConjunctionDetector tests (RED)**
 
-   ```csharp
-   using FluentAssertions;
-   using MissionClear.Api.Domain;
-   using MissionClear.Api.Services.Conjunctions;
-   using MissionClear.Api.Services.LaunchWindows;
-   using Xunit;
+`MissionClear.Tests/Services/ConjunctionDetectorTests.cs`:
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services;
+using Xunit;
 
-   namespace MissionClear.Tests.Services;
+namespace MissionClear.Tests.Services;
 
-   public class LaunchWindowCalculatorTests
-   {
-       private readonly ILaunchWindowCalculator _sut =
-           new LaunchWindowCalculator(new ConjunctionDetector());
+public sealed class ConjunctionDetectorTests
+{
+    private readonly ConjunctionDetector _detector = new();
 
-       [Fact]
-       public void Returns_windows_within_specified_range()
-       {
-           var from = DateTime.UtcNow;
-           var to = from.AddHours(2);
-           var windows = _sut.Calculate("ISS", from, to,
-               Array.Empty<OrbitalObject>(), windowSlotMinutes: 15);
-           windows.Should().OnlyContain(w => w.StartUtc >= from && w.EndUtc <= to);
-       }
+    // ISS at lat=0, lon=0, alt=408 km (uses KnownDestinations.ISS)
+    private static MissionDestination IssDestination => KnownDestinations.ISS;
 
-       [Fact]
-       public void Windows_are_sorted_by_risk_score_ascending()
-       {
-           var from = DateTime.UtcNow;
-           var windows = _sut.Calculate("ISS", from, from.AddHours(4),
-               Array.Empty<OrbitalObject>());
-           windows.Select(w => w.RiskScore).Should().BeInAscendingOrder();
-       }
+    private static OrbitalObject MakeDebris(string id, double lat, double lon, double altKm) =>
+        new(id, $"DEB-{id}", "debris", lat, lon, altKm, 7.5, "celestrak", DateTime.UtcNow);
 
-       [Fact]
-       public void Zero_conjunctions_yields_risk_zero_and_recommended()
-       {
-           var windows = _sut.Calculate("ISS", DateTime.UtcNow, DateTime.UtcNow.AddHours(1),
-               Array.Empty<OrbitalObject>());
-           windows.Should().OnlyContain(w => w.RiskScore == 0.0 && w.IsRecommended);
-       }
+    [Fact]
+    public void Detect_ReturnsCritical_WhenDebrisUnder1km()
+    {
+        // Debris at same lat/lon as destination, 0 km altitude diff → distance < 1 km → Critical
+        var debris = new[] { MakeDebris("1", 0.0, 0.0, 408.0) };
 
-       [Fact]
-       public void Close_conjunctions_raise_risk_score()
-       {
-           var iss = KnownDestinations.Get("ISS")!;
-           var close = Enumerable.Range(0, 5).Select(i =>
-               new OrbitalObject($"c{i}", $"D{i}", "debris",
-                   iss.LatitudeDeg, iss.LongitudeDeg, iss.AltitudeKm + 0.5,
-                   7.6, "celestrak", DateTime.UtcNow)).ToList();
-           var windows = _sut.Calculate("ISS", DateTime.UtcNow, DateTime.UtcNow.AddMinutes(30), close);
-           windows.Should().Contain(w => w.RiskScore > 0);
-       }
+        var results = _detector.Detect(IssDestination, DateTime.UtcNow, debris);
 
-       [Fact]
-       public void Total_windows_capped_by_maxWindows()
-       {
-           var windows = _sut.Calculate("ISS", DateTime.UtcNow,
-               DateTime.UtcNow.AddDays(5), Array.Empty<OrbitalObject>(),
-               windowSlotMinutes: 15, maxWindows: 10);
-           windows.Should().HaveCountLessThanOrEqualTo(10);
-       }
+        results.Should().NotBeEmpty();
+        results[0].RiskLevel.Should().Be(RiskLevel.Critical);
+    }
 
-       [Fact]
-       public void Invalid_destination_returns_empty()
-       {
-           var windows = _sut.Calculate("NOPE", DateTime.UtcNow,
-               DateTime.UtcNow.AddHours(1), Array.Empty<OrbitalObject>());
-           windows.Should().BeEmpty();
-       }
-   }
-   ```
+    [Fact]
+    public void Detect_ReturnsEmpty_WhenDebrisFarAway()
+    {
+        // Debris at 1500 km altitude — well beyond the 200 km filter radius
+        var debris = new[] { MakeDebris("far", 80.0, 120.0, 1500.0) };
 
-7. **[ ] Implement ILaunchWindowCalculator + LaunchWindowCalculator (GREEN)**
+        var results = _detector.Detect(IssDestination, DateTime.UtcNow, debris);
 
-   ```csharp
-   // ILaunchWindowCalculator.cs
-   using MissionClear.Api.Domain;
+        results.Should().BeEmpty();
+    }
 
-   namespace MissionClear.Api.Interfaces;
+    [Fact]
+    public void Detect_ClassifiesHigh_WhenDistanceBetween1And5km()
+    {
+        // Debris 2 km above ISS altitude, same lat/lon → distance ≈ 2 km → High
+        var debris = new[] { MakeDebris("hi", 0.0, 0.0, 410.0) };
 
-   public interface ILaunchWindowCalculator
-   {
-       IReadOnlyList<LaunchWindow> Calculate(
-           string destinationId,
-           DateTime fromUtc,
-           DateTime toUtc,
-           IReadOnlyList<OrbitalObject> currentDebris,
-           int windowSlotMinutes = 15,
-           int maxWindows = 48);
-   }
-   ```
+        var results = _detector.Detect(IssDestination, DateTime.UtcNow, debris);
 
-   ```csharp
-   // LaunchWindowCalculator.cs
-   using MissionClear.Api.Domain;
-   using MissionClear.Api.Services.Conjunctions;
+        results.Should().NotBeEmpty();
+        results[0].RiskLevel.Should().BeOneOf(RiskLevel.High, RiskLevel.Critical);
+    }
 
-   namespace MissionClear.Api.Interfaces;
+    [Fact]
+    public void Detect_DoesNotThrow_WhenDebrisListIsEmpty()
+    {
+        var act = () => _detector.Detect(IssDestination, DateTime.UtcNow, []);
 
-   public sealed class LaunchWindowCalculator : ILaunchWindowCalculator
-   {
-       private const double SafeKm = 25.0;
-       private const double MaxKm = 200.0;
-       private const double RecommendedThreshold = 0.05;
+        act.Should().NotThrow();
+    }
+}
+```
 
-       private readonly IConjunctionDetector _detector;
+**5. [ ] Run tests — confirm RED** (ConjunctionDetector not found → build error)
 
-       public LaunchWindowCalculator(IConjunctionDetector detector) => _detector = detector;
+**6. [ ] Implement ConjunctionDetector (GREEN)**
 
-       public IReadOnlyList<LaunchWindow> Calculate(
-           string destinationId,
-           DateTime fromUtc,
-           DateTime toUtc,
-           IReadOnlyList<OrbitalObject> currentDebris,
-           int windowSlotMinutes = 15,
-           int maxWindows = 48)
-       {
-           var dest = KnownDestinations.Get(destinationId);
-           if (dest is null || toUtc <= fromUtc) return Array.Empty<LaunchWindow>();
+`MissionClear.Api/Services/ConjunctionDetector.cs`:
+```csharp
+using MissionClear.Api.Helpers;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
 
-           var slot = TimeSpan.FromMinutes(windowSlotMinutes);
-           var windows = new List<LaunchWindow>();
+namespace MissionClear.Api.Services;
 
-           for (var start = fromUtc; start + slot <= toUtc && windows.Count < maxWindows * 4; start += slot)
-           {
-               var end = start + slot;
-               var conjunctions = _detector.Detect(
-                   currentDebris,
-                   dest.LatitudeDeg, dest.LongitudeDeg, dest.AltitudeKm,
-                   safeRadiusKm: MaxKm);
+public sealed class ConjunctionDetector : IConjunctionDetector
+{
+    // Destination orbit is treated as a point at (LatitudeDeg=0, LongitudeDeg=0, altKm) for proximity filtering.
+    // MissionDestination exposes LatitudeDeg and LongitudeDeg (defaulting to 0.0 for equatorial orbit assumption).
+    // OrbitalObject exposes Latitude and Longitude (no "Deg" suffix).
 
-               var riskScore = ComputeRiskScore(conjunctions);
-               windows.Add(new LaunchWindow(
-                   StartUtc: start,
-                   EndUtc: end,
-                   RiskScore: Math.Round(riskScore, 4),
-                   DeltaVKmS: dest.DeltaVKmS,
-                   DurationHours: dest.MissionDurationHours,
-                   IsRecommended: riskScore < RecommendedThreshold,
-                   Conjunctions: conjunctions));
-           }
+    public IReadOnlyList<ConjunctionResult> Detect(
+        MissionDestination destination,
+        DateTime at,
+        IReadOnlyList<OrbitalObject> debris)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(debris);
 
-           return windows
-               .OrderBy(w => w.RiskScore)
-               .Take(maxWindows)
-               .ToList();
-       }
+        var destLat = destination.LatitudeDeg;
+        var destLon = destination.LongitudeDeg;
+        var destAlt = destination.AltitudeKm;
 
-       private static double ComputeRiskScore(IReadOnlyList<ConjunctionResult> conjunctions)
-       {
-           if (conjunctions.Count == 0) return 0.0;
-           double total = 0.0;
-           foreach (var c in conjunctions)
-           {
-               if (c.ClosestApproachKm >= MaxKm) continue;
-               var contrib = 1.0 - (c.ClosestApproachKm - SafeKm) / (MaxKm - SafeKm);
-               total += Math.Max(0.0, contrib);
-           }
-           return Math.Min(1.0, total);
-       }
-   }
-   ```
+        var results = new List<ConjunctionResult>();
 
-8. **[ ] Run tests — confirm GREEN**
+        foreach (var obj in debris)
+        {
+            // 3D distance: horizontal Haversine at average altitude + altitude difference
+            // OrbitalObject uses Latitude and Longitude (no "Deg" suffix)
+            var avgAlt = (destAlt + obj.AltitudeKm) / 2.0;
+            var horizKm = OrbitalMath.HaversineKm(
+                destLat, destLon,
+                obj.Latitude, obj.Longitude,
+                OrbitalMath.EarthRadiusKm + avgAlt);
+            var vertKm   = Math.Abs(destAlt - obj.AltitudeKm);
+            var distKm   = Math.Sqrt(horizKm * horizKm + vertKm * vertKm);
 
-9. **[ ] Commit:** `feat(services): add LaunchWindowCalculator with risk-weighted slots`
+            if (distKm > 200) continue; // only process debris within 200 km
+
+            // Deterministic time-of-closest-approach: seeded by debris id hash for test stability
+            var seed  = obj.Id.GetHashCode();
+            var etaMin = new Random(seed).Next(5, 90);
+            var toca  = at.AddMinutes(etaMin);
+
+            results.Add(new ConjunctionResult(
+                obj.Id,
+                obj.Name,
+                Math.Round(distKm, 3),
+                toca,
+                RiskScoring.Classify(distKm)));
+        }
+
+        return results.OrderBy(r => r.ClosestApproachKm).ToList().AsReadOnly();
+    }
+}
+```
+
+> **Note:** `MissionDestination` exposes `LatitudeDeg` and `LongitudeDeg` (fixed in Phase 02,
+> defaulting to 0.0 for equatorial orbit assumption). `OrbitalObject` exposes `Latitude` and
+> `Longitude` (NO "Deg" suffix) — use `obj.Latitude` and `obj.Longitude` in all code.
+
+**7. [ ] Run tests — confirm GREEN (4 pass)**
+
+**8. [ ] Commit:** `feat(simulation): add ConjunctionDetector with Haversine 3D proximity and deterministic TOCA`
 
 ---
 
-### Phase 3: MissionSimulationService (commit 3)
+### Phase 3 — LaunchWindowCalculator (commit 3)
 
-10. **[ ] Write MissionSimulationService tests (RED)** (`MissionClear.Tests/Services/MissionSimulationServiceTests.cs`)
-    - 5 tests: 10-point trajectory, score in [0,100], invalid destination throws `ArgumentException`, empty debris → ~100, many close debris → low score.
+**9. [ ] Write LaunchWindowCalculator tests (RED)**
 
-    ```csharp
-    using FluentAssertions;
-    using MissionClear.Api.Domain;
-    using MissionClear.Api.Dtos;
-    using MissionClear.Api.Services.Conjunctions;
-    using MissionClear.Api.Services.Missions;
-    using Xunit;
+`MissionClear.Tests/Services/LaunchWindowCalculatorTests.cs`:
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services;
+using Xunit;
 
-    namespace MissionClear.Tests.Services;
+namespace MissionClear.Tests.Services;
 
-    public class MissionSimulationServiceTests
+public sealed class LaunchWindowCalculatorTests
+{
+    private readonly LaunchWindowCalculator _calc = new();
+
+    private static readonly MissionDestination Iss = KnownDestinations.ISS;
+
+    [Fact]
+    public void Calculate_Returns48Windows_For12HourRange()
     {
-        private readonly IMissionSimulationService _sut =
-            new MissionSimulationService(new ConjunctionDetector());
+        var from = new DateTime(2025, 5, 27, 0, 0, 0, DateTimeKind.Utc);
+        var to   = from.AddHours(12);
 
-        private static MissionSimulateRequest Req(string dest = "ISS") =>
-            new(dest, DateTime.UtcNow, DateTime.UtcNow.AddHours(6));
+        var windows = _calc.Calculate(Iss, from, to, []);
 
-        [Fact]
-        public void Returns_trajectory_with_10_points()
-        {
-            var resp = _sut.Simulate(Req(), Array.Empty<OrbitalObject>());
-            resp.Trajectory.Should().HaveCount(10);
-        }
-
-        [Fact]
-        public void Valid_destination_returns_score_in_range()
-        {
-            var resp = _sut.Simulate(Req(), Array.Empty<OrbitalObject>());
-            resp.MissionScore.Should().BeInRange(0, 100);
-        }
-
-        [Fact]
-        public void Invalid_destination_throws_ArgumentException()
-        {
-            var act = () => _sut.Simulate(Req("NOPE"), Array.Empty<OrbitalObject>());
-            act.Should().Throw<ArgumentException>();
-        }
-
-        [Fact]
-        public void Empty_debris_yields_high_score()
-        {
-            var resp = _sut.Simulate(Req(), Array.Empty<OrbitalObject>());
-            resp.RiskScore.Should().Be(0.0);
-            resp.MissionScore.Should().BeGreaterThan(50);
-        }
-
-        [Fact]
-        public void Many_close_debris_yields_low_score()
-        {
-            var iss = KnownDestinations.Get("ISS")!;
-            var crowd = Enumerable.Range(0, 30).Select(i =>
-                new OrbitalObject($"d{i}", $"D{i}", "debris",
-                    iss.LatitudeDeg, iss.LongitudeDeg, iss.AltitudeKm + 0.2,
-                    7.6, "celestrak", DateTime.UtcNow)).ToList();
-
-            var resp = _sut.Simulate(Req(), crowd);
-            resp.RiskScore.Should().BeGreaterThan(0.5);
-            resp.MissionScore.Should().BeLessThan(60);
-        }
+        windows.Should().HaveCount(48); // 12h / 15min = 48 slots
     }
-    ```
 
-11. **[ ] Implement IMissionSimulationService + MissionSimulationService (GREEN)**
-
-    ```csharp
-    // IMissionSimulationService.cs
-    using MissionClear.Api.Domain;
-    using MissionClear.Api.Dtos;
-
-    namespace MissionClear.Api.Interfaces;
-
-    public interface IMissionSimulationService
+    [Fact]
+    public void Calculate_IsRecommended_WhenRiskScoreUnder01()
     {
-        MissionSimulateResponse Simulate(
-            MissionSimulateRequest request,
-            IReadOnlyList<OrbitalObject> currentDebris);
+        var from    = DateTime.UtcNow;
+        var windows = _calc.Calculate(Iss, from, from.AddMinutes(15), []);
+
+        windows.Should().HaveCount(1);
+        windows[0].IsRecommended.Should().Be(windows[0].RiskScore < 0.1);
     }
-    ```
 
-    ```csharp
-    // MissionSimulationService.cs
-    using MissionClear.Api.Domain;
-    using MissionClear.Api.Dtos;
-    using MissionClear.Api.Services.Conjunctions;
-
-    namespace MissionClear.Api.Interfaces;
-
-    public sealed class MissionSimulationService : IMissionSimulationService
+    [Fact]
+    public void Calculate_ReturnsEmptyConjunctions_WhenNoCacheData()
     {
-        private const int TrajectoryPoints = 10;
-        private const double SafeKm = 25.0;
-        private const double MaxKm = 200.0;
+        var from    = DateTime.UtcNow;
+        var windows = _calc.Calculate(Iss, from, from.AddMinutes(15), []);
 
-        private readonly IConjunctionDetector _detector;
-
-        public MissionSimulationService(IConjunctionDetector detector) => _detector = detector;
-
-        public MissionSimulateResponse Simulate(
-            MissionSimulateRequest request,
-            IReadOnlyList<OrbitalObject> currentDebris)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-            var dest = KnownDestinations.Get(request.DestinationId)
-                ?? throw new ArgumentException(
-                    $"Unknown destination '{request.DestinationId}'", nameof(request));
-
-            var trajectory = BuildTrajectory(request.DepartureUtc, request.ArrivalUtc, dest);
-            var aggregated = new Dictionary<string, ConjunctionResult>(StringComparer.Ordinal);
-
-            foreach (var p in trajectory)
-            {
-                var hits = _detector.Detect(currentDebris, p.LatitudeDeg, p.LongitudeDeg, p.AltitudeKm);
-                foreach (var h in hits)
-                {
-                    if (!aggregated.TryGetValue(h.DebrisId, out var existing)
-                        || h.ClosestApproachKm < existing.ClosestApproachKm)
-                    {
-                        aggregated[h.DebrisId] = h;
-                    }
-                }
-            }
-
-            var conjunctions = aggregated.Values
-                .OrderBy(c => c.ClosestApproachKm)
-                .ToList();
-
-            var riskScore = ComputeRiskScore(conjunctions);
-            var efficiency = Math.Max(0.0, 1.0 - dest.DeltaVKmS / 12.0) * 50.0;
-            var safety = (1.0 - riskScore) * 50.0;
-            var missionScore = Math.Clamp((int)Math.Round(efficiency + safety), 0, 100);
-
-            return new MissionSimulateResponse(
-                Trajectory: trajectory,
-                Obstacles: conjunctions,
-                RiskScore: Math.Round(riskScore, 4),
-                MissionScore: missionScore,
-                Destination: dest.Id,
-                DeltaVKmS: dest.DeltaVKmS,
-                DurationHours: dest.MissionDurationHours);
-        }
-
-        private static IReadOnlyList<TrajectoryPointDto> BuildTrajectory(
-            DateTime departure, DateTime arrival, DestinationProfile dest)
-        {
-            var points = new List<TrajectoryPointDto>(TrajectoryPoints);
-            var totalSeconds = Math.Max(1, (arrival - departure).TotalSeconds);
-
-            for (var i = 0; i < TrajectoryPoints; i++)
-            {
-                var t = (double)i / (TrajectoryPoints - 1);
-                var lat = Lerp(0.0, dest.LatitudeDeg, t);
-                var lon = Lerp(0.0, dest.LongitudeDeg, t);
-                var alt = Lerp(0.0, dest.AltitudeKm, t);
-                var ts = departure.AddSeconds(totalSeconds * t);
-                points.Add(new TrajectoryPointDto(lat, lon, alt, ts));
-            }
-            return points;
-        }
-
-        private static double Lerp(double a, double b, double t) => a + (b - a) * t;
-
-        private static double ComputeRiskScore(IReadOnlyList<ConjunctionResult> conjunctions)
-        {
-            if (conjunctions.Count == 0) return 0.0;
-            double total = 0.0;
-            foreach (var c in conjunctions)
-            {
-                if (c.ClosestApproachKm >= MaxKm) continue;
-                total += Math.Max(0.0, 1.0 - (c.ClosestApproachKm - SafeKm) / (MaxKm - SafeKm));
-            }
-            return Math.Min(1.0, total);
-        }
+        windows[0].Conjunctions.Should().BeEmpty();
     }
-    ```
 
-12. **[ ] Run tests — confirm GREEN**
+    [Fact]
+    public void Calculate_SetsCorrectDeltaV_ForDestination()
+    {
+        var from    = DateTime.UtcNow;
+        var windows = _calc.Calculate(Iss, from, from.AddMinutes(15), []);
 
-13. **[ ] Commit:** `feat(services): add MissionSimulationService with trajectory + scoring`
+        windows[0].DeltaVKmS.Should().Be(Iss.DeltaVKmS);
+    }
+}
+```
+
+**10. [ ] Run tests — confirm RED**
+
+**11. [ ] Implement LaunchWindowCalculator (GREEN)**
+
+`MissionClear.Api/Services/LaunchWindowCalculator.cs`:
+```csharp
+using MissionClear.Api.Helpers;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
+
+namespace MissionClear.Api.Services;
+
+public sealed class LaunchWindowCalculator : ILaunchWindowCalculator
+{
+    private const int SlotMinutes = 15;
+
+    private readonly IConjunctionDetector _detector;
+
+    // Default constructor used in tests (no DI needed for a pure service)
+    public LaunchWindowCalculator() : this(new ConjunctionDetector()) { }
+
+    public LaunchWindowCalculator(IConjunctionDetector detector)
+    {
+        _detector = detector;
+    }
+
+    public IReadOnlyList<LaunchWindow> Calculate(
+        MissionDestination destination,
+        DateTime from,
+        DateTime to,
+        IReadOnlyList<OrbitalObject> debris)
+    {
+        ArgumentNullException.ThrowIfNull(destination);
+        ArgumentNullException.ThrowIfNull(debris);
+
+        var windows = new List<LaunchWindow>();
+        var current = from;
+
+        while (current < to)
+        {
+            var slotEnd     = current.AddMinutes(SlotMinutes);
+            var conjunctions = _detector.Detect(destination, current, debris);
+            var riskScore    = RiskScoring.ComputeScore(
+                conjunctions.Select(c => c.ClosestApproachKm));
+
+            windows.Add(new LaunchWindow(
+                Start:         current,
+                End:           slotEnd,
+                RiskScore:     Math.Round(riskScore, 4),
+                DeltaVKmS:     destination.DeltaVKmS,
+                DurationHours: destination.MissionDurationHours,
+                IsRecommended: riskScore < 0.1,
+                Conjunctions:  conjunctions));
+
+            current = slotEnd;
+        }
+
+        return windows.AsReadOnly();
+    }
+}
+```
+
+> **Note on `LaunchWindow` constructor:** Use `Start:` and `End:` (not `StartUtc:`/`EndUtc:`).
+> These are the canonical parameter names as defined in Phase 02's `LaunchWindow` record.
+
+**12. [ ] Run tests — confirm GREEN (4 pass)**
+
+**13. [ ] Commit:** `feat(simulation): add LaunchWindowCalculator with 15-minute slots and risk scoring`
 
 ---
 
-### Phase 4: SessionStore (commit 4)
+### Phase 4 — SessionStore (commit 4)
 
-14. **[ ] Write SessionStore tests (RED)** (`MissionClear.Tests/Services/SessionStoreTests.cs`)
+**14. [ ] Write SessionStore tests (RED)**
 
-    ```csharp
-    using FluentAssertions;
-    using Microsoft.Extensions.Options;
-    using MissionClear.Api.Domain;
-    using MissionClear.Api.Services.Sessions;
-    using Xunit;
+`MissionClear.Tests/Services/SessionStoreTests.cs`:
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services;
+using Xunit;
 
-    namespace MissionClear.Tests.Services;
+namespace MissionClear.Tests.Services;
 
-    public class SessionStoreTests
+public sealed class SessionStoreTests
+{
+    private static SessionStore NewStore(Func<DateTime>? clock = null) =>
+        new(ttlMinutes: 30, clock: clock ?? (() => DateTime.UtcNow));
+
+    private static MissionSession NewSession(string id = "sess_test") => new()
     {
-        private static SessionStore NewStore(int ttlMinutes = 30) =>
-            new(Options.Create(new SessionStoreOptions { TtlMinutes = ttlMinutes }),
-                () => DateTime.UtcNow);
+        SessionId     = id,
+        UserId        = Guid.NewGuid(),
+        Destination   = "ISS",
+        DepartureTime = DateTime.UtcNow,
+        ArrivalTime   = DateTime.UtcNow.AddHours(6),
+        Status        = SessionStatus.Active,
+        CreatedAtUtc  = DateTime.UtcNow,
+        ExpiresAt     = DateTime.UtcNow.AddMinutes(30)
+    };
 
-        [Fact]
-        public void CreateSession_returns_active_session_with_prefix()
+    [Fact]
+    public void Set_Then_Get_ReturnsSameSession()
+    {
+        var store   = NewStore();
+        var session = NewSession();
+
+        store.Set(session);
+        var result = store.Get(session.SessionId);
+
+        result.Should().NotBeNull();
+        result!.SessionId.Should().Be(session.SessionId);
+    }
+
+    [Fact]
+    public void Remove_ThenGet_ReturnsNull()
+    {
+        var store   = NewStore();
+        var session = NewSession("sess_remove");
+
+        store.Set(session);
+        store.Remove(session.SessionId);
+
+        store.Get(session.SessionId).Should().BeNull();
+    }
+
+    [Fact]
+    public void Get_ReturnsNull_WhenSessionExpired()
+    {
+        var now   = DateTime.UtcNow;
+        var clock = now;
+        var store = NewStore(clock: () => clock);
+
+        var session = NewSession("sess_expire") with
         {
-            var s = NewStore().CreateSession("user1", new SessionRequest("ISS", "easy"));
-            s.SessionId.Should().StartWith("sess_");
-            s.Status.Should().Be(SessionStatus.Active);
-            s.UserId.Should().Be("user1");
+            CreatedAtUtc = now,
+            ExpiresAt    = now.AddMinutes(30)
+        };
+        store.Set(session);
+
+        // Advance clock past TTL
+        clock = now.AddMinutes(31);
+
+        store.Get("sess_expire").Should().BeNull();
+    }
+
+    [Fact]
+    public void PurgeExpired_RemovesOnlyExpiredSessions()
+    {
+        var now   = DateTime.UtcNow;
+        var clock = now;
+        var store = NewStore(clock: () => clock);
+
+        var fresh   = NewSession("sess_fresh") with { ExpiresAt = now.AddMinutes(30) };
+        var expired = NewSession("sess_dead")  with { ExpiresAt = now.AddMinutes(-1) };
+
+        store.Set(fresh);
+        store.Set(expired);
+
+        clock = now.AddMinutes(31);
+        store.PurgeExpired();
+
+        store.Get("sess_fresh").Should().BeNull(); // also expired now
+        store.Get("sess_dead").Should().BeNull();
+    }
+}
+```
+
+**15. [ ] Run tests — confirm RED**
+
+**16. [ ] Implement SessionStore (GREEN)**
+
+`MissionClear.Api/Services/SessionStore.cs`:
+```csharp
+using System.Collections.Concurrent;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
+
+namespace MissionClear.Api.Services;
+
+/// <summary>
+/// Thread-safe in-memory session store backed by ConcurrentDictionary.
+/// TTL is enforced on reads and by explicit PurgeExpired calls.
+/// Singleton lifetime — shared across all requests.
+/// </summary>
+public sealed class SessionStore : ISessionStore
+{
+    private readonly ConcurrentDictionary<string, MissionSession> _sessions = new();
+    private readonly int _ttlMinutes;
+    private readonly Func<DateTime> _clock;
+
+    /// <summary>Production constructor — reads TTL from OrbitalSettings.</summary>
+    public SessionStore(int ttlMinutes = 30)
+        : this(ttlMinutes, () => DateTime.UtcNow) { }
+
+    /// <summary>Test constructor — injects a controllable clock.</summary>
+    public SessionStore(int ttlMinutes, Func<DateTime> clock)
+    {
+        _ttlMinutes = ttlMinutes;
+        _clock      = clock;
+    }
+
+    public void Set(MissionSession session)
+    {
+        ArgumentNullException.ThrowIfNull(session);
+        _sessions[session.SessionId] = session;
+    }
+
+    public MissionSession? Get(string sessionId)
+    {
+        if (!_sessions.TryGetValue(sessionId, out var s)) return null;
+        if (_clock() >= s.ExpiresAt)
+        {
+            _sessions.TryRemove(sessionId, out _);
+            return null;
         }
+        return s;
+    }
 
-        [Fact]
-        public void GetSession_returns_null_for_unknown_id()
+    public void Remove(string sessionId) => _sessions.TryRemove(sessionId, out _);
+
+    public void PurgeExpired()
+    {
+        var now = _clock();
+        foreach (var kv in _sessions)
         {
-            NewStore().GetSession("sess_nope").Should().BeNull();
-        }
-
-        [Fact]
-        public void TryCompleteSession_updates_status_and_scores()
-        {
-            var store = NewStore();
-            var s = store.CreateSession(null, new SessionRequest("ISS", "easy"));
-            var ok = store.TryCompleteSession(s.SessionId, SessionStatus.Success, 87, 0.1, 9.4, 3, 12.5);
-            ok.Should().BeTrue();
-            var reloaded = store.GetSession(s.SessionId)!;
-            reloaded.Status.Should().Be(SessionStatus.Success);
-            reloaded.FinalMissionScore.Should().Be(87);
-        }
-
-        [Fact]
-        public void TryCompleteSession_returns_false_for_unknown_session()
-        {
-            NewStore().TryCompleteSession("sess_x", SessionStatus.Success, 0, 0, 0, 0, 0)
-                .Should().BeFalse();
-        }
-
-        [Fact]
-        public void Expired_sessions_return_null()
-        {
-            var now = DateTime.UtcNow;
-            var clock = now;
-            var store = new SessionStore(
-                Options.Create(new SessionStoreOptions { TtlMinutes = 30 }),
-                () => clock);
-
-            var s = store.CreateSession(null, new SessionRequest("ISS", "easy"));
-            clock = now.AddMinutes(31);
-            store.GetSession(s.SessionId).Should().BeNull();
+            if (now >= kv.Value.ExpiresAt)
+                _sessions.TryRemove(kv.Key, out _);
         }
     }
-    ```
+}
+```
 
-15. **[ ] Implement SessionStore + SessionStoreOptions (GREEN)**
+**17. [ ] Run tests — confirm GREEN (4 pass)**
 
-    ```csharp
-    // SessionStoreOptions.cs
-    namespace MissionClear.Api.Services.Sessions;
+> **Note on `MissionSession`:** The model must include `SessionId`, `UserId`, `Destination`,
+> `Status` (enum `SessionStatus`), `CreatedAtUtc`, `ExpiresAt`. If Phase 02 did not add
+> `ExpiresAt`, add it as `DateTime ExpiresAt { get; init; }` to the `MissionSession` entity now.
 
-    public sealed class SessionStoreOptions
-    {
-        public int TtlMinutes { get; set; } = 30;
-    }
-    ```
-
-    ```csharp
-    // SessionStore.cs
-    using System.Collections.Concurrent;
-    using System.Security.Cryptography;
-    using Microsoft.Extensions.Options;
-    using MissionClear.Api.Domain;
-
-    namespace MissionClear.Api.Services.Sessions;
-
-    public sealed class SessionStore
-    {
-        private readonly ConcurrentDictionary<string, MissionSession> _sessions = new();
-        private readonly SessionStoreOptions _options;
-        private readonly Func<DateTime> _clock;
-
-        public SessionStore(IOptions<SessionStoreOptions> options)
-            : this(options, () => DateTime.UtcNow) { }
-
-        public SessionStore(IOptions<SessionStoreOptions> options, Func<DateTime> clock)
-        {
-            _options = options.Value;
-            _clock = clock;
-        }
-
-        public MissionSession CreateSession(string? userId, SessionRequest request)
-        {
-            ArgumentNullException.ThrowIfNull(request);
-            PurgeExpiredSessions();
-
-            var session = new MissionSession
-            {
-                SessionId = "sess_" + RandomToken(16),
-                UserId = userId,
-                DestinationId = request.DestinationId,
-                Difficulty = request.Difficulty,
-                Status = SessionStatus.Active,
-                CreatedAtUtc = _clock(),
-            };
-            _sessions[session.SessionId] = session;
-            return session;
-        }
-
-        public MissionSession? GetSession(string sessionId)
-        {
-            PurgeExpiredSessions();
-            if (!_sessions.TryGetValue(sessionId, out var s)) return null;
-            if (IsExpired(s))
-            {
-                _sessions.TryRemove(sessionId, out _);
-                return null;
-            }
-            return s;
-        }
-
-        public bool TryCompleteSession(
-            string sessionId,
-            SessionStatus status,
-            double score,
-            double risk,
-            double deltaV,
-            int obstacles,
-            double durationSeconds)
-        {
-            if (!_sessions.TryGetValue(sessionId, out var s)) return false;
-            s.Status = status;
-            s.FinalMissionScore = score;
-            s.FinalRiskScore = risk;
-            s.DeltaVKmS = deltaV;
-            s.ObstaclesEncountered = obstacles;
-            s.DurationSeconds = durationSeconds;
-            s.CompletedAtUtc = _clock();
-            return true;
-        }
-
-        public void PurgeExpiredSessions()
-        {
-            foreach (var kv in _sessions)
-            {
-                if (IsExpired(kv.Value))
-                    _sessions.TryRemove(kv.Key, out _);
-            }
-        }
-
-        private bool IsExpired(MissionSession s) =>
-            s.Status == SessionStatus.Active
-            && _clock() - s.CreatedAtUtc > TimeSpan.FromMinutes(_options.TtlMinutes);
-
-        private static string RandomToken(int bytes)
-        {
-            var buf = RandomNumberGenerator.GetBytes(bytes);
-            return Convert.ToHexString(buf).ToLowerInvariant();
-        }
-    }
-    ```
-
-16. **[ ] Run tests — confirm GREEN**
-
-17. **[ ] Commit:** `feat(services): add in-memory SessionStore with TTL and thread-safety`
+**18. [ ] Commit:** `feat(simulation): add thread-safe SessionStore with TTL enforcement`
 
 ---
 
-### Phase 5: MissionSseService (commit 5)
+### Phase 5 — MissionSimulationService (commit 5)
 
-18. **[ ] Write MissionSseService tests (RED)** (`MissionClear.Tests/Services/MissionSseServiceTests.cs`)
+**19. [ ] Write MissionSimulationService tests (RED)**
 
-    ```csharp
-    using System.Text;
-    using FluentAssertions;
-    using Microsoft.AspNetCore.Http;
-    using MissionClear.Api.Domain;
-    using MissionClear.Api.Services.Streaming;
-    using Xunit;
+`MissionClear.Tests/Services/MissionSimulationServiceTests.cs`:
+```csharp
+using FluentAssertions;
+using MissionClear.Api.Dtos.Mission;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services;
+using MissionClear.Api.Services.Interfaces;
+using Moq;
+using Xunit;
 
-    namespace MissionClear.Tests.Services;
+namespace MissionClear.Tests.Services;
 
-    public class MissionSseServiceTests
+public sealed class MissionSimulationServiceTests
+{
+    private static IMissionSimulationService BuildSut(
+        IOrbitalCache? cache = null,
+        ISessionStore? store = null,
+        IMissionHistoryService? history = null)
     {
-        private static (HttpResponse Resp, MemoryStream Body) NewResponse()
-        {
-            var ctx = new DefaultHttpContext();
-            var body = new MemoryStream();
-            ctx.Response.Body = body;
-            return (ctx.Response, body);
-        }
+        cache   ??= Mock.Of<IOrbitalCache>(c => c.GetAll() == Array.Empty<OrbitalObject>());
+        store   ??= new SessionStore();
+        history ??= Mock.Of<IMissionHistoryService>();
 
-        private static readonly OrbitalObject[] Sample = new[]
+        return new MissionSimulationService(
+            new ConjunctionDetector(),
+            new LaunchWindowCalculator(),
+            cache,
+            store,
+            history);
+    }
+
+    [Fact]
+    public async Task SimulateAsync_ReturnsValidResponse_ForKnownDestination()
+    {
+        var sut  = BuildSut();
+        var req  = new SimulateRequest(
+            "ISS",
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2025, 1, 1, 6, 0, 0, DateTimeKind.Utc));
+
+        var result = await sut.SimulateAsync(req);
+
+        result.Should().NotBeNull();
+        result.MissionScore.Should().BeInRange(0, 100);
+        result.RiskScore.Should().BeInRange(0.0, 1.0);
+    }
+
+    [Fact]
+    public async Task SimulateAsync_ReturnsMissionScore100_WhenNoDebris()
+    {
+        var sut    = BuildSut();
+        var req    = new SimulateRequest(
+            "ISS",
+            new DateTime(2025, 1, 1, 0, 0, 0, DateTimeKind.Utc),
+            new DateTime(2025, 1, 1, 6, 0, 0, DateTimeKind.Utc));
+        var result = await sut.SimulateAsync(req);
+
+        // No debris → risk_score = 0 → safety = 50; efficiency depends on deltaV
+        result.RiskScore.Should().Be(0.0);
+        result.MissionScore.Should().BeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task CreateSessionAsync_ReturnsSessionWithStreamUrl()
+    {
+        var sut = BuildSut();
+        var req = new SessionRequest("ISS", DateTime.UtcNow.ToString("O"), DateTime.UtcNow.AddHours(6).ToString("O"));
+
+        var result = await sut.CreateSessionAsync(req);
+
+        result.Should().NotBeNull();
+        result.SessionId.Should().NotBeNullOrEmpty();
+        result.StreamUrl.Should().NotBeNullOrEmpty();
+    }
+
+    [Fact]
+    public async Task CompleteSessionAsync_ReturnsScore_WhenSessionExists()
+    {
+        var store = new SessionStore();
+        var sut   = BuildSut(store: store);
+
+        var sessionResp = await sut.CreateSessionAsync(
+            new SessionRequest("ISS", DateTime.UtcNow.ToString("O"), DateTime.UtcNow.AddHours(6).ToString("O")));
+
+        var result = await sut.CompleteSessionAsync(
+            sessionResp.SessionId,
+            new CompleteSessionRequest(Status: "aborted", SaveToHistory: false),
+            userId: null);
+
+        result.Should().NotBeNull();
+        result.MissionScore.Should().BeInRange(0, 100);
+    }
+}
+```
+
+**20. [ ] Run tests — confirm RED**
+
+**21. [ ] Implement MissionSimulationService (GREEN)**
+
+`MissionClear.Api/Services/MissionSimulationService.cs`:
+```csharp
+using System.Security.Cryptography;
+using MissionClear.Api.Dtos.Mission;
+using MissionClear.Api.Helpers;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
+
+namespace MissionClear.Api.Services;
+
+public sealed class MissionSimulationService : IMissionSimulationService
+{
+    private readonly IConjunctionDetector     _detector;
+    private readonly ILaunchWindowCalculator  _calculator;
+    private readonly IOrbitalCache            _orbitalCache;
+    private readonly ISessionStore            _sessions;
+    private readonly IMissionHistoryService   _history;
+
+    public MissionSimulationService(
+        IConjunctionDetector    detector,
+        ILaunchWindowCalculator calculator,
+        IOrbitalCache           orbitalCache,
+        ISessionStore           sessions,
+        IMissionHistoryService  history)
+    {
+        _detector     = detector;
+        _calculator   = calculator;
+        _orbitalCache = orbitalCache;
+        _sessions     = sessions;
+        _history      = history;
+    }
+
+    // ── SimulateAsync ──────────────────────────────────────────────────────────
+
+    public Task<SimulateResponse> SimulateAsync(
+        SimulateRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var destination = KnownDestinations.Get(request.Destination)
+            ?? throw new ArgumentException(
+                $"Unknown destination '{request.Destination}'.", nameof(request));
+
+        var debris       = _orbitalCache.GetAll();
+        var conjunctions = _detector.Detect(destination, request.DepartureUtc, debris);
+        var riskScore    = RiskScoring.ComputeScore(
+            conjunctions.Select(c => c.ClosestApproachKm));
+        var (_, _, missionScore) = MissionScoring.Compute(destination.DeltaVKmS, riskScore);
+
+        // Map ConjunctionResult → ObstacleDto
+        var obstaclesDto = conjunctions.Select(c => new ObstacleDto(
+            DebrisId: c.DebrisId,
+            DebrisName: c.DebrisName,
+            ClosestApproachKm: c.ClosestApproachKm,
+            TimeOfClosestApproach: c.TimeOfClosestApproach.ToString("O"),
+            RiskLevel: c.RiskLevel.ToString().ToLowerInvariant()
+        )).ToList().AsReadOnly();
+
+        var response = new SimulateResponse(
+            SessionId:    string.Empty,
+            Destination:  destination.Id,
+            DepartureUtc: request.DepartureUtc,
+            ArrivalUtc:   request.ArrivalUtc,
+            Trajectory:   Array.Empty<object>(),
+            Obstacles:    obstaclesDto,
+            MissionScore: missionScore,
+            RiskScore:    Math.Round(riskScore, 4));
+
+        return Task.FromResult(response);
+    }
+
+    // ── CreateSessionAsync ─────────────────────────────────────────────────────
+
+    public Task<SessionResponse> CreateSessionAsync(
+        SessionRequest request, CancellationToken ct = default)
+    {
+        ArgumentNullException.ThrowIfNull(request);
+
+        var destination = KnownDestinations.Get(request.Destination)
+            ?? throw new ArgumentException(
+                $"Unknown destination '{request.Destination}'.", nameof(request));
+
+        var sessionId = "sess_" + Convert.ToHexString(RandomNumberGenerator.GetBytes(8))
+                                        .ToLowerInvariant();
+
+        var now = DateTime.UtcNow;
+        var session = new MissionSession
         {
-            new OrbitalObject("1", "TEST", "debris", 0, 0, 400, 7.6, "celestrak", DateTime.UtcNow)
+            SessionId    = sessionId,
+            Destination  = destination.Id,
+            DepartureTime = DateTime.Parse(request.DepartureTime, null,
+                                System.Globalization.DateTimeStyles.RoundtripKind),
+            ArrivalTime  = DateTime.Parse(request.ArrivalTime, null,
+                                System.Globalization.DateTimeStyles.RoundtripKind),
+            ExpiresAt    = now.AddMinutes(30),
+            UserId       = Guid.Empty,  // filled in by caller when authenticated
+            CreatedAtUtc = now
         };
 
-        [Fact]
-        public async Task First_event_is_debris_update()
-        {
-            var (resp, body) = NewResponse();
-            var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
-            var sut = new MissionSseService(NullLoggerFactory());
+        _sessions.Set(session);
 
-            await sut.StreamAsync("sess_test", resp, Sample, cts.Token);
+        var response = new SessionResponse(
+            SessionId:     sessionId,
+            Destination:   destination.Id,
+            DepartureTime: request.DepartureTime,
+            ArrivalTime:   request.ArrivalTime,
+            StreamUrl:     $"/api/mission/stream/{sessionId}",
+            ExpiresAt:     session.ExpiresAt.ToString("O"));
 
-            var text = Encoding.UTF8.GetString(body.ToArray());
-            text.Should().StartWith("event: debris_update");
-        }
-
-        [Fact]
-        public async Task Frames_use_event_and_data_with_blank_separator()
-        {
-            var (resp, body) = NewResponse();
-            var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(150));
-            var sut = new MissionSseService(NullLoggerFactory());
-
-            await sut.StreamAsync("sess_test", resp, Sample, cts.Token);
-
-            var text = Encoding.UTF8.GetString(body.ToArray());
-            text.Should().Contain("event: debris_update\ndata: ");
-            text.Should().Contain("\n\n");
-        }
-
-        [Fact]
-        public async Task Heartbeat_contains_session_id_and_timestamp()
-        {
-            var (resp, body) = NewResponse();
-            var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(400));
-            var sut = new MissionSseService(NullLoggerFactory(),
-                debrisInterval: TimeSpan.FromMilliseconds(50),
-                heartbeatInterval: TimeSpan.FromMilliseconds(80));
-
-            await sut.StreamAsync("sess_test", resp, Sample, cts.Token);
-
-            var text = Encoding.UTF8.GetString(body.ToArray());
-            text.Should().Contain("event: heartbeat");
-            text.Should().Contain("sess_test");
-        }
-
-        [Fact]
-        public async Task Stream_stops_when_token_cancelled()
-        {
-            var (resp, body) = NewResponse();
-            var cts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
-            var sut = new MissionSseService(NullLoggerFactory());
-
-            var t = sut.StreamAsync("sess_test", resp, Sample, cts.Token);
-            await t;
-            t.IsCompletedSuccessfully.Should().BeTrue();
-        }
-
-        private static Microsoft.Extensions.Logging.ILoggerFactory NullLoggerFactory() =>
-            Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance;
+        return Task.FromResult(response);
     }
-    ```
 
-19. **[ ] Implement MissionSseService (GREEN)** (`MissionClear.Api/Services/Streaming/MissionSseService.cs`)
-    - Default intervals: 30s debris, 15s heartbeat. Test constructor overload for short intervals.
-    - Headers: `Content-Type: text/event-stream`, `Cache-Control: no-cache`, `X-Accel-Buffering: no`.
+    // ── CompleteSessionAsync ───────────────────────────────────────────────────
 
-    ```csharp
-    using System.Text.Json;
-    using Microsoft.AspNetCore.Http;
-    using Microsoft.Extensions.Logging;
-    using MissionClear.Api.Domain;
-
-    namespace MissionClear.Api.Services.Streaming;
-
-    public sealed class MissionSseService
+    public async Task<CompleteSessionResponse> CompleteSessionAsync(
+        string sessionId,
+        CompleteSessionRequest request,
+        Guid? userId,
+        CancellationToken ct = default)
     {
-        private static readonly JsonSerializerOptions JsonOpts = new(JsonSerializerDefaults.Web);
+        ArgumentException.ThrowIfNullOrEmpty(sessionId);
+        ArgumentNullException.ThrowIfNull(request);
 
-        private readonly ILogger<MissionSseService> _logger;
-        private readonly TimeSpan _debrisInterval;
-        private readonly TimeSpan _heartbeatInterval;
+        var session = _sessions.Get(sessionId)
+            ?? throw new InvalidOperationException($"Session '{sessionId}' not found or expired.");
 
-        public MissionSseService(ILoggerFactory loggerFactory)
-            : this(loggerFactory, TimeSpan.FromSeconds(30), TimeSpan.FromSeconds(15)) { }
+        var destination = KnownDestinations.Get(session.Destination)
+            ?? throw new InvalidOperationException(
+                $"Destination '{session.Destination}' no longer valid.");
 
-        public MissionSseService(
-            ILoggerFactory loggerFactory,
-            TimeSpan debrisInterval,
-            TimeSpan heartbeatInterval)
+        var debris       = _orbitalCache.GetAll();
+        var conjunctions = _detector.Detect(destination, DateTime.UtcNow, debris);
+        var riskScore    = RiskScoring.ComputeScore(
+            conjunctions.Select(c => c.ClosestApproachKm));
+        var (_, _, score) = MissionScoring.Compute(destination.DeltaVKmS, riskScore);
+
+        var status   = request.Status;
+        string? missionId = null;
+
+        if (request.SaveToHistory && userId.HasValue)
         {
-            _logger = loggerFactory.CreateLogger<MissionSseService>();
-            _debrisInterval = debrisInterval;
-            _heartbeatInterval = heartbeatInterval;
+            var summary = await _history.SaveMissionAsync(
+                userId:       userId!.Value,
+                sessionId:    sessionId,
+                status:       status,
+                riskScore:    riskScore,
+                deltaV:       destination.DeltaVKmS,
+                score:        score,
+                obstacles:    conjunctions.Count,
+                departure:    session.DepartureTime,
+                arrival:      DateTime.UtcNow,
+                destination:  session.Destination,
+                obstaclesData: conjunctions.Cast<object>().ToList().AsReadOnly(),
+                ct:           ct);
+            missionId = $"msn_{summary.Id}";
         }
 
-        public async Task StreamAsync(
-            string sessionId,
-            HttpResponse response,
-            IReadOnlyList<OrbitalObject> initialDebris,
-            CancellationToken ct)
-        {
-            response.Headers["Content-Type"] = "text/event-stream";
-            response.Headers["Cache-Control"] = "no-cache";
-            response.Headers["X-Accel-Buffering"] = "no";
+        _sessions.Remove(sessionId);
 
-            await WriteEventAsync(response, "debris_update", new
-            {
-                objects = initialDebris,
-                count = initialDebris.Count,
-                timestamp = DateTime.UtcNow,
-            }, ct);
+        var duration = (DateTime.UtcNow - session.CreatedAtUtc).TotalSeconds;
 
-            var lastDebris = DateTime.UtcNow;
-            var lastHeartbeat = DateTime.UtcNow;
-
-            try
-            {
-                while (!ct.IsCancellationRequested)
-                {
-                    var now = DateTime.UtcNow;
-
-                    if (now - lastHeartbeat >= _heartbeatInterval)
-                    {
-                        await WriteEventAsync(response, "heartbeat", new
-                        {
-                            session_id = sessionId,
-                            timestamp = now,
-                        }, ct);
-                        lastHeartbeat = now;
-                    }
-
-                    if (now - lastDebris >= _debrisInterval)
-                    {
-                        await WriteEventAsync(response, "debris_update", new
-                        {
-                            objects = initialDebris,
-                            count = initialDebris.Count,
-                            timestamp = now,
-                        }, ct);
-                        lastDebris = now;
-                    }
-
-                    try
-                    {
-                        await Task.Delay(TimeSpan.FromMilliseconds(50), ct);
-                    }
-                    catch (OperationCanceledException) { break; }
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                _logger.LogInformation("SSE stream cancelled for {SessionId}", sessionId);
-            }
-        }
-
-        private static async Task WriteEventAsync(
-            HttpResponse response, string eventName, object payload, CancellationToken ct)
-        {
-            var json = JsonSerializer.Serialize(payload, JsonOpts);
-            await response.WriteAsync($"event: {eventName}\ndata: {json}\n\n", ct);
-            await response.Body.FlushAsync(ct);
-        }
+        return new CompleteSessionResponse(
+            SessionId:            sessionId,
+            Status:               status,
+            MissionScore:         score,
+            RiskScore:            Math.Round(riskScore, 4),
+            DeltaVKmS:            destination.DeltaVKmS,
+            ObstaclesEncountered: conjunctions.Count,
+            DurationSeconds:      duration,
+            SavedToHistory:       request.SaveToHistory && userId.HasValue,
+            MissionId:            missionId);
     }
-    ```
+}
+```
 
-20. **[ ] Run tests — confirm GREEN**
+> **DTOs required (add to `MissionClear.Api/Dtos/Mission/` if not present from Phase 02):**
+>
+> ```csharp
+> // SimulateRequest.cs
+> public sealed record SimulateRequest(string Destination, DateTime DepartureUtc, DateTime ArrivalUtc);
+>
+> // SimulateResponse.cs
+> public sealed record SimulateResponse(
+>     string SessionId,
+>     string Destination,
+>     DateTime DepartureUtc,
+>     DateTime ArrivalUtc,
+>     IReadOnlyList<object> Trajectory,
+>     IReadOnlyList<ObstacleDto> Obstacles,
+>     int MissionScore,
+>     double RiskScore);
+>
+> // ObstacleDto.cs
+> public sealed record ObstacleDto(
+>     string DebrisId,
+>     double ClosestApproachKm,
+>     string TimeOfClosestApproach,
+>     string RiskLevel);
+>
+> // SessionRequest.cs
+> public sealed record SessionRequest(string Destination, string DepartureTime, string ArrivalTime);
+> // DepartureTime and ArrivalTime are ISO 8601 strings (e.g. "2025-05-27T14:32:00Z")
+> // The implementation parses them to DateTime internally.
+>
+> // SessionResponse.cs
+> public sealed record SessionResponse(string SessionId, string StreamUrl);
+>
+> // CompleteSessionRequest.cs
+> public sealed record CompleteSessionRequest(string Status, bool SaveToHistory = false);
+>
+> // CompleteSessionResponse.cs
+> public sealed record CompleteSessionResponse(
+>     string SessionId,
+>     string Status,
+>     int MissionScore,
+>     double RiskScore,
+>     double DeltaVKmS,
+>     int ObstaclesEncountered,
+>     double DurationSeconds,
+>     bool SavedToHistory,
+>     string? MissionId);
+> ```
+>
+> **Note:** `SaveMissionRequest` record does NOT exist. `IMissionHistoryService.SaveMissionAsync`
+> takes 11 positional parameters directly (see Phase 06 interface definition). Do not define or
+> use a `SaveMissionRequest` wrapper type anywhere.
 
-21. **[ ] Commit:** `feat(services): add MissionSseService for real-time streaming`
+**22. [ ] Run tests — confirm GREEN (4 pass)**
+
+**23. [ ] Commit:** `feat(simulation): add MissionSimulationService with session lifecycle and history integration`
 
 ---
 
-### Phase 6: DI registration + smoke (commit 6)
+### Phase 6 — MissionSseService (commit 6)
 
-22. **[ ] Register all services in Program.cs**
+`MissionSseService` is not unit-tested in isolation (SSE tests over real HTTP response streams
+are brittle in unit test mode). It is covered by integration tests in Phase 07. Implement directly.
 
-    ```csharp
-    builder.Services.Configure<SessionStoreOptions>(
-        builder.Configuration.GetSection("Sessions"));
+**24. [ ] Implement MissionSseService**
 
-    builder.Services.AddScoped<IConjunctionDetector, ConjunctionDetector>();
-    builder.Services.AddScoped<ILaunchWindowCalculator, LaunchWindowCalculator>();
-    builder.Services.AddScoped<IMissionSimulationService, MissionSimulationService>();
-    builder.Services.AddSingleton<SessionStore>();
-    builder.Services.AddScoped<MissionSseService>();
-    ```
+`MissionClear.Api/Services/MissionSseService.cs`:
+```csharp
+using System.Text.Json;
+using Microsoft.AspNetCore.Http;
+using Microsoft.Extensions.Logging;
+using MissionClear.Api.Helpers;
+using MissionClear.Api.Models;
+using MissionClear.Api.Services.Interfaces;
 
-23. **[ ] Add default Sessions section to appsettings.json**
-    ```json
-    "Sessions": { "TtlMinutes": 30 }
-    ```
+namespace MissionClear.Api.Services;
 
-24. **[ ] Run full test suite + `dotnet build`** — all green, no warnings.
+/// <summary>
+/// Streams Server-Sent Events for an active mission session.
+/// SSE format: "event: {name}\ndata: {json}\n\n"
+/// Simulated time: 1 real second = 10 simulated minutes (demo acceleration).
+/// </summary>
+public sealed class MissionSseService : IMissionSseService
+{
+    private static readonly JsonSerializerOptions JsonOpts =
+        new(JsonSerializerDefaults.Web);
 
-25. **[ ] Commit:** `chore(di): wire mission simulation services into DI container`
+    private static readonly TimeSpan HeartbeatInterval  = TimeSpan.FromSeconds(15);
+    private static readonly TimeSpan DebrisUpdateInterval = TimeSpan.FromSeconds(30);
+
+    // Simulated time step per real second (10 minutes simulated per 1s real)
+    private static readonly TimeSpan SimulatedStep = TimeSpan.FromMinutes(10);
+
+    private readonly ISessionStore     _sessions;
+    private readonly IOrbitalCache     _orbitalCache;
+    private readonly IConjunctionDetector _detector;
+    private readonly ILogger<MissionSseService> _logger;
+
+    public MissionSseService(
+        ISessionStore         sessions,
+        IOrbitalCache         orbitalCache,
+        IConjunctionDetector  detector,
+        ILogger<MissionSseService> logger)
+    {
+        _sessions     = sessions;
+        _orbitalCache = orbitalCache;
+        _detector     = detector;
+        _logger       = logger;
+    }
+
+    public async Task StreamAsync(
+        string sessionId, HttpResponse response, CancellationToken ct)
+    {
+        response.Headers["Content-Type"]      = "text/event-stream";
+        response.Headers["Cache-Control"]     = "no-cache";
+        response.Headers["X-Accel-Buffering"] = "no";
+        response.Headers["Connection"]        = "keep-alive";
+
+        var session = _sessions.Get(sessionId);
+        if (session is null)
+        {
+            await WriteEventAsync(response, "error",
+                new { message = "Session not found or expired", session_id = sessionId }, ct);
+            return;
+        }
+
+        var destination = KnownDestinations.Get(session.Destination);
+        if (destination is null)
+        {
+            await WriteEventAsync(response, "error",
+                new { message = "Unknown destination", session_id = sessionId }, ct);
+            return;
+        }
+
+        var debris = _orbitalCache.GetAll();
+
+        // Initial debris update
+        await WriteEventAsync(response, "debris_update", new
+        {
+            session_id = sessionId,
+            count      = debris.Count,
+            timestamp  = DateTime.UtcNow
+        }, ct);
+
+        var lastHeartbeat   = DateTime.UtcNow;
+        var lastDebrisUpdate = DateTime.UtcNow;
+        var simulatedTime   = DateTime.UtcNow;
+        var pollInterval    = TimeSpan.FromMilliseconds(50);
+
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                var now          = DateTime.UtcNow;
+                simulatedTime   += SimulatedStep;
+
+                if (now - lastHeartbeat >= HeartbeatInterval)
+                {
+                    await WriteEventAsync(response, "heartbeat", new
+                    {
+                        session_id       = sessionId,
+                        timestamp        = now,
+                        simulated_time   = simulatedTime
+                    }, ct);
+                    lastHeartbeat = now;
+                }
+
+                if (now - lastDebrisUpdate >= DebrisUpdateInterval)
+                {
+                    // Refresh debris and check for objects entering 200 km zone
+                    // OrbitalObject uses Latitude and Longitude (no "Deg" suffix)
+                    debris = _orbitalCache.GetAll();
+                    var conjunctions = _detector.Detect(destination, simulatedTime, debris);
+                    var nearbyDebris = debris
+                        .Where(obj =>
+                        {
+                            var horizKm = OrbitalMath.HaversineKm(
+                                destination.LatitudeDeg, destination.LongitudeDeg,
+                                obj.Latitude, obj.Longitude,
+                                OrbitalMath.EarthRadiusKm + (destination.AltitudeKm + obj.AltitudeKm) / 2);
+                            var vertKm  = Math.Abs(destination.AltitudeKm - obj.AltitudeKm);
+                            return Math.Sqrt(horizKm * horizKm + vertKm * vertKm) <= 500.0;
+                        })
+                        .ToList();
+
+                    await WriteEventAsync(response, "debris_update", new
+                    {
+                        session_id = sessionId,
+                        nearby     = nearbyDebris.Count,
+                        timestamp  = now
+                    }, ct);
+
+                    // Alert on conjunctions entering 200 km zone
+                    foreach (var c in conjunctions)
+                    {
+                        await WriteEventAsync(response, "conjunction_alert", new
+                        {
+                            session_id          = sessionId,
+                            debris_id           = c.DebrisId,
+                            closest_approach_km = c.ClosestApproachKm,
+                            risk_level          = c.RiskLevel.ToString().ToLowerInvariant(),
+                            toca                = c.TimeOfClosestApproach
+                        }, ct);
+                    }
+
+                    lastDebrisUpdate = now;
+                }
+
+                await Task.Delay(pollInterval, ct);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            _logger.LogDebug("SSE stream cancelled for session {SessionId}", sessionId);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "SSE stream error for session {SessionId}", sessionId);
+        }
+        finally
+        {
+            await WriteEventAsync(response, "session_complete", new
+            {
+                session_id   = sessionId,
+                timestamp    = DateTime.UtcNow,
+                simulated_time = simulatedTime
+            }, CancellationToken.None);
+        }
+    }
+
+    private static async Task WriteEventAsync(
+        HttpResponse response, string eventName, object payload, CancellationToken ct)
+    {
+        var json = JsonSerializer.Serialize(payload, JsonOpts);
+        await response.WriteAsync($"event: {eventName}\ndata: {json}\n\n", ct);
+        await response.Body.FlushAsync(ct);
+    }
+}
+```
+
+**25. [ ] Verify build: `dotnet build` — must succeed**
+
+**26. [ ] Commit:** `feat(simulation): add MissionSseService with heartbeat, debris_update, conjunction_alert, session_complete events`
+
+---
+
+### Phase 7 — DI Registration (commit 7)
+
+**27. [ ] Register services in Program.cs**
+
+Add the following to the DI registration block in `MissionClear.Api/Program.cs` after the
+orbital cache and orbital engine registrations from Phase 03:
+
+```csharp
+// Simulation — scoped so each request gets a fresh ConjunctionDetector/LaunchWindowCalculator
+builder.Services.AddScoped<IConjunctionDetector, ConjunctionDetector>();
+builder.Services.AddScoped<ILaunchWindowCalculator, LaunchWindowCalculator>();
+builder.Services.AddScoped<IMissionSimulationService, MissionSimulationService>();
+
+// Session store — singleton (shared in-memory dictionary across all requests)
+builder.Services.AddSingleton<ISessionStore>(
+    _ => new SessionStore(
+        ttlMinutes: builder.Configuration.GetValue<int>("OrbitalSettings:SessionTtlMinutes", 30)));
+
+// SSE service — scoped (one per SSE connection)
+builder.Services.AddScoped<IMissionSseService, MissionSseService>();
+```
+
+**28. [ ] Add `SessionTtlMinutes` to `appsettings.json` if not already present:**
+
+```json
+"OrbitalSettings": {
+  ...
+  "SessionTtlMinutes": 30
+}
+```
+
+**29. [ ] Run full test suite:**
+
+```powershell
+dotnet test MissionClear.Tests/MissionClear.Tests.csproj --filter "Conjunction|LaunchWindow|Session|Simulation" -v normal
+```
+
+Expected: all tests pass, 0 failures.
+
+**30. [ ] Run full build:**
+
+```powershell
+dotnet build
+```
+
+Expected: `Build succeeded. 0 Error(s). 0 Warning(s).`
+
+**31. [ ] Commit:** `chore(di): register simulation services in DI container`
 
 ---
 
 ## Testing Strategy
 
-- **Unit tests (xUnit + FluentAssertions):** every service has a dedicated test file. Target coverage 80%+.
-- **Integration tests:** deferred to plan-07. Services here are pure (no I/O, no HTTP) except `MissionSseService` exercised via `DefaultHttpContext`.
-- **Coverage check:** `dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura`
+| Test file | Count | Scope |
+|---|---|---|
+| `ConjunctionDetectorTests` | 4 | Unit — pure computation, no I/O |
+| `LaunchWindowCalculatorTests` | 4 | Unit — pure computation, no I/O |
+| `SessionStoreTests` | 4 | Unit — in-memory with injectable clock |
+| `MissionSimulationServiceTests` | 4 | Unit — mocked IOrbitalCache + IMissionHistoryService |
+
+`MissionSseService` is covered by integration tests in Phase 07 via `WebApplicationFactory`.
+
+Coverage command:
+```powershell
+dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=cobertura
+```
+
+Target: ≥ 80% on `MissionClear.Api/Services/`.
 
 ---
 
 ## Risks & Mitigations
 
 | Risk | Mitigation |
-|------|------------|
-| Haversine math errors yield wrong distances | Tests use precomputed values at the equator (lat≈0) with `BeApproximately` tolerance |
-| `LaunchWindowCalculator` same risk for every slot | MVP simplification — real variability arrives when SGP4 runs per slot post-MVP |
-| `SessionStore` memory growth under load | TTL purge runs on every `GetSession`/`CreateSession`; acceptable for MVP |
-| SSE tests flaky on slow CI | Constructor overload accepts short intervals; CTS cancels within 150-400 ms |
-| `ArgumentException` vs `DomainException` | Tests pin `ArgumentException`; controller layer maps to HTTP 404 |
-| Risk score formula misalignment with mobile | Constants `SAFE_KM=25`, `MAX_KM=200` documented in code comments |
+|---|---|
+| `MissionDestination` missing `LatitudeDeg`/`LongitudeDeg` | Phase 02 adds these properties defaulting to 0.0 for equatorial orbit assumption |
+| `OrbitalObject` uses `Latitude`/`Longitude` (no "Deg" suffix) | Always use `obj.Latitude` and `obj.Longitude` — never `obj.LatitudeDeg` / `obj.LongitudeDeg` |
+| `KnownDestinations.Get(id)` alias | Phase 02 adds `Get` as alias for `FindById`; both are valid |
+| `IOrbitalCache.GetAll()` method name differs from Phase 03 | Match exactly Phase 03's interface method; check `IOrbitalCache.cs` before finalizing |
+| DTOs in `Dtos/Mission/` not yet created | Create them in this phase if Phase 02 left them as stubs; all are simple records |
+| `IMissionHistoryService` interface not yet available (Phase 06) | Use `Mock.Of<IMissionHistoryService>()` in tests; the production DI wiring waits for Phase 06 |
+| `SaveMissionAsync` signature | Takes 11 positional parameters — NO `SaveMissionRequest` wrapper type |
+| `CompleteSessionRequest` missing `Status` field | Canonical definition is `(string Status, bool SaveToHistory = false)` — always pass Status |
+| `CompleteSessionResponse` must have 9 fields | Canonical: SessionId, Status, MissionScore, RiskScore, DeltaVKmS, ObstaclesEncountered, DurationSeconds, SavedToHistory, MissionId |
 
 ---
 
 ## Success Criteria
 
-- [ ] All 5 service test files exist (6+6+5+5+4 = 26 tests minimum)
-- [ ] `dotnet test` passes with 0 failures
-- [ ] Coverage on `MissionClear.Api/Services/**` ≥ 80%
-- [ ] `dotnet build` clean (0 warnings, 0 errors)
-- [ ] `ConjunctionDetector` correctly classifies: Critical < 1km, High < 5km, Medium < 10km
-- [ ] `LaunchWindowCalculator` returns sorted, capped, recommended-flagged windows
-- [ ] `MissionSimulationService` throws `ArgumentException` for unknown destinations and produces 10-point trajectories
-- [ ] `SessionStore` is thread-safe (`ConcurrentDictionary`), enforces TTL, exposes test-seam clock
-- [ ] `MissionSseService` writes spec-conformant `event:`/`data:`/blank-line frames and cancels cleanly
-- [ ] All 5 services registered in DI (3 scoped, 1 singleton, 1 scoped streaming)
-- [ ] 6 atomic commits with conventional-commit messages
+- [ ] All 5 interface files exist in `MissionClear.Api/Services/Interfaces/`
+- [ ] `ConjunctionDetector` correctly classifies: Critical < 1 km, High < 5 km, Medium < 10 km, Low otherwise
+- [ ] `ConjunctionDetector` uses `OrbitalMath.HaversineKm` (not an inline Haversine)
+- [ ] `ConjunctionDetector` uses `RiskScoring.Classify` (not inline thresholds)
+- [ ] `ConjunctionDetector` reads `obj.Latitude` and `obj.Longitude` (NOT `obj.LatitudeDeg`/`obj.LongitudeDeg`)
+- [ ] `LaunchWindowCalculator` produces exactly 48 windows for a 12-hour range
+- [ ] `LaunchWindowCalculator` sets `IsRecommended = riskScore < 0.1`
+- [ ] `LaunchWindowCalculator` uses `Start:` and `End:` in `LaunchWindow` constructor (NOT `StartUtc:`/`EndUtc:`)
+- [ ] `LaunchWindowCalculator` copies `DeltaVKmS` and `DurationHours` from `MissionDestination`
+- [ ] `SessionStore` is a `ConcurrentDictionary`-backed singleton
+- [ ] `SessionStore` expires sessions on `Get` when `_clock() >= ExpiresAt`
+- [ ] `MissionSimulationService.SimulateAsync` throws `ArgumentException` for unknown destinations
+- [ ] `MissionSimulationService.SimulateAsync` returns `SimulateResponse` with `ObstacleDto` list (not `ConjunctionResult`)
+- [ ] `MissionSimulationService.CreateSessionAsync` returns a `stream_url` pointing to the SSE endpoint
+- [ ] `MissionSimulationService.CreateSessionAsync` creates `MissionSession` with `UserId` and `CreatedAtUtc`
+- [ ] `MissionSimulationService.CompleteSessionAsync` calls `IMissionHistoryService.SaveMissionAsync` only when `SaveToHistory && userId != null`
+- [ ] `MissionSimulationService.CompleteSessionAsync` calls `SaveMissionAsync` with 11 positional parameters (no wrapper type)
+- [ ] `MissionSimulationService.CompleteSessionAsync` returns 9-field `CompleteSessionResponse`
+- [ ] `MissionSseService` writes SSE frames with `event: {name}\ndata: {json}\n\n` format
+- [ ] `MissionSseService` sets `Content-Type: text/event-stream` and `Cache-Control: no-cache`
+- [ ] `MissionSseService` uses `obj.Latitude`/`obj.Longitude` for `OrbitalObject` (NOT `obj.LatitudeDeg`/`obj.LongitudeDeg`)
+- [ ] All 16 unit tests pass with `dotnet test`
+- [ ] `dotnet build` clean — 0 errors, 0 warnings
+- [ ] All services registered in DI (3 scoped, 1 singleton, 1 scoped)
 
 ---
 
 ## Relevant Files
 
-- `MissionClear.Api/Interfaces/IConjunctionDetector.cs`
+**Interfaces:**
+- `MissionClear.Api/Services/Interfaces/IConjunctionDetector.cs`
+- `MissionClear.Api/Services/Interfaces/ILaunchWindowCalculator.cs`
+- `MissionClear.Api/Services/Interfaces/IMissionSimulationService.cs`
+- `MissionClear.Api/Services/Interfaces/ISessionStore.cs`
+- `MissionClear.Api/Services/Interfaces/IMissionSseService.cs`
+
+**Implementations:**
 - `MissionClear.Api/Services/ConjunctionDetector.cs`
-- `MissionClear.Api/Interfaces/ILaunchWindowCalculator.cs`
 - `MissionClear.Api/Services/LaunchWindowCalculator.cs`
-- `MissionClear.Api/Interfaces/IMissionSimulationService.cs`
 - `MissionClear.Api/Services/MissionSimulationService.cs`
 - `MissionClear.Api/Services/SessionStore.cs`
-- `MissionClear.Api/Services/SessionStoreOptions.cs`
 - `MissionClear.Api/Services/MissionSseService.cs`
-- `MissionClear.Api/Program.cs`
-- `MissionClear.Api/appsettings.json`
+
+**DTOs (add if absent):**
+- `MissionClear.Api/Dtos/Mission/SimulateRequest.cs`
+- `MissionClear.Api/Dtos/Mission/SimulateResponse.cs`
+- `MissionClear.Api/Dtos/Mission/ObstacleDto.cs`
+- `MissionClear.Api/Dtos/Mission/SessionRequest.cs`
+- `MissionClear.Api/Dtos/Mission/SessionResponse.cs`
+- `MissionClear.Api/Dtos/Mission/CompleteSessionRequest.cs`
+- `MissionClear.Api/Dtos/Mission/CompleteSessionResponse.cs`
+
+**Tests:**
 - `MissionClear.Tests/Services/ConjunctionDetectorTests.cs`
 - `MissionClear.Tests/Services/LaunchWindowCalculatorTests.cs`
-- `MissionClear.Tests/Services/MissionSimulationServiceTests.cs`
 - `MissionClear.Tests/Services/SessionStoreTests.cs`
-- `MissionClear.Tests/Services/MissionSseServiceTests.cs`
+- `MissionClear.Tests/Services/MissionSimulationServiceTests.cs`
+
+**Modified:**
+- `MissionClear.Api/Program.cs` (DI registrations)
+- `MissionClear.Api/appsettings.json` (SessionTtlMinutes)
