@@ -1,5 +1,6 @@
 <Solution>
   <Project Path="MissionClear.Api/MissionClear.Api.csproj" />
   <Project Path="MissionClear.AppHost/MissionClear.AppHost.csproj" />
+  <Project Path="MissionClear.ServiceDefaults/MissionClear.ServiceDefaults.csproj" />
   <Project Path="MissionClear.Tests/MissionClear.Tests.csproj" />
 </Solution>
