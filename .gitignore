@@ -6,5 +6,11 @@ bin/
 *.suo
 *.lock.json
 appsettings.Production.json
+# MySQL connection strings with credentials — never commit
+MissionClear.Api/appsettings.Development.json
+
+# SQLite remnants
 *.db
+*.db-shm
+*.db-wal
 *.db-journal
