@@ -7,12 +7,12 @@ var mysql = builder.AddMySql("mysql")
     .AddDatabase("missionclear");
 
 // Api aguarda MySQL estar healthy antes de iniciar
-var api = builder.AddProject<Projects.MissionClear_Api>("api")
+var api = builder.AddProject("api", "../MissionClear.Api/MissionClear.Api.csproj")
     .WithReference(mysql)
     .WaitFor(mysql);
 
 // Web MVC aguarda Api estar healthy antes de iniciar
-builder.AddProject<Projects.MissionClear_Web>("web")
+builder.AddProject("web", "../MissionClear.Web/MissionClear.Web.csproj")
     .WithReference(api)
     .WaitFor(api);
 

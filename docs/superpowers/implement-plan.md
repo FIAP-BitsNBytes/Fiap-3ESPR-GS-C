@@ -1,20 +1,20 @@
 # Prompt Padrão — Implementar Plano
 
-> Copie este prompt, substitua `{{PLAN}}` pelo caminho do plano (ex: `plan-03-orbital`) e envie.
+> Copie este prompt, substitua `{{plan-00-scaffolding}}` pelo caminho do plano (ex: `plan-03-orbital`) e envie.
 
 ---
 
 ## PROMPT
 
 ```
-Implemente o plano `docs/superpowers/plans/{{PLAN}}.md` **completo e funcionando**.
+Implemente o plano `docs/superpowers/plans/{{plan-00-scaffolding}}.md` **completo e funcionando**.
 
 ## Contexto obrigatório — leia ANTES de tocar qualquer arquivo
 
 1. `CLAUDE.md` — regras do projeto, stack, não-negociáveis
 2. `docs/API_CONTRACT.md` — contratos de resposta e campos (fonte de verdade)
 3. `docs/superpowers/plans/architecture-overview.md` — mapa de arquivos e módulos
-4. `docs/superpowers/plans/{{PLAN}}.md` — o que implementar (siga à risca)
+4. `docs/superpowers/plans/{{plan-00-scaffolding}}.md` — o que implementar (siga à risca)
 
 ## Regras de execução
 
@@ -130,11 +130,11 @@ Implemente o plano `docs/superpowers/plans/plan-04-auth.md` completo e funcionan
 
 | Variável | Valor exemplo |
 |---|---|
-| `{{PLAN}}` | `plan-03-orbital` |
-| `{{PLAN}}` | `plan-04-auth` |
-| `{{PLAN}}` | `plan-05-simulation` |
-| `{{PLAN}}` | `plan-06-history-dashboard` |
-| `{{PLAN}}` | `plan-07-controllers` |
-| `{{PLAN}}` | `plan-08-mvc-web` |
+| `{{plan-00-scaffolding}}` | `plan-03-orbital` |
+| `{{plan-00-scaffolding}}` | `plan-04-auth` |
+| `{{plan-00-scaffolding}}` | `plan-05-simulation` |
+| `{{plan-00-scaffolding}}` | `plan-06-history-dashboard` |
+| `{{plan-00-scaffolding}}` | `plan-07-controllers` |
+| `{{plan-00-scaffolding}}` | `plan-08-mvc-web` |
 
 > Plans 00, 01 e 02 têm regras especiais de arquivo exclusivo — leia o `parallel-execution-guide.md` antes de rodar em paralelo.

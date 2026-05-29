@@ -1,4 +1,6 @@
-﻿namespace MissionClear.Tests;
+using Xunit;
+
+namespace MissionClear.Tests;
 
 public class UnitTest1
 {
