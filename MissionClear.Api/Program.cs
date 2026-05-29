@@ -23,9 +23,10 @@ builder.Services.Configure<CorsSettings>(builder.Configuration.GetSection(CorsSe
 
 // ── Database (MySQL via Aspire service discovery) ───────────────────────────
 // "missionclear" = nome do database registrado no AppHost
-// Quando rodando via AppHost: connection string injetada automaticamente
-// Quando rodando stand-alone: lê ConnectionStrings:missionclear do appsettings
-builder.AddMySqlDbContext<MissionClear.Api.Data.AppDbContext>("missionclear");
+if (Environment.GetEnvironmentVariable("EF_DESIGN_TIME") != "true")
+{
+    builder.AddMySqlDbContext<MissionClear.Api.Data.AppDbContext>("missionclear");
+}
 
 // ── HTTP clients ─────────────────────────────────────────────────────────────
 builder.Services.AddHttpClient();
@@ -63,7 +64,9 @@ builder.Services.AddAuthorization();
 builder.Services.AddControllers();
 
 // ── DI registrations (preenchido nas fases seguintes) ───────────────────────
-// builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<MissionClear.Api.Data.Repositories.IUserRepository, MissionClear.Api.Data.Repositories.UserRepository>();
+builder.Services.AddScoped<MissionClear.Api.Data.Repositories.IRefreshTokenRepository, MissionClear.Api.Data.Repositories.RefreshTokenRepository>();
+builder.Services.AddScoped<MissionClear.Api.Data.Repositories.IMissionRepository, MissionClear.Api.Data.Repositories.MissionRepository>();
 // builder.Services.AddScoped<IAuthService, AuthService>();
 // ... demais serviços adicionados nos planos 01–07
 
