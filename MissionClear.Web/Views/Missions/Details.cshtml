@@ -1,0 +1,20 @@
+@{ ViewData["Title"] = "Detalhe da Missão"; }
+
+<h1>Detalhe da Missão</h1>
+<div class="card">
+    @{
+        var json = ViewBag.MissionJson;
+        if (json != null && json.ValueKind.ToString() != "Undefined")
+        {
+            <p><strong>Destino:</strong> @json.GetProperty("destination_display").GetString()</p>
+            <p><strong>Status:</strong>
+                <span class="badge @(json.GetProperty("status").GetString() == "success" ? "badge-success" : "badge-failure")">
+                    @json.GetProperty("status").GetString()
+                </span>
+            </p>
+            <p><strong>Score:</strong> @json.GetProperty("mission_score").GetInt32()</p>
+            <p><strong>Risco:</strong> @json.GetProperty("risk_score").GetDouble().ToString("P1")</p>
+        }
+    }
+</div>
+<a asp-action="Index" class="btn btn-primary">← Voltar</a>

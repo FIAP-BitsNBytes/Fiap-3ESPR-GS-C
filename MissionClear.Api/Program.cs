@@ -92,7 +92,24 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.WriteIndented               = false;
     });
 
-builder.Services.AddHttpClient();
+builder.Services.AddHttpClient("celestrak", client =>
+{
+    // CelesTrak requires a meaningful User-Agent with contact info.
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "Mozilla/5.0 (compatible; MissionClear/1.0; FIAP academic project; +mailto:guss.badass@gmail.com)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json, text/plain, */*");
+    client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
+    client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
+    client.DefaultRequestHeaders.Add("DNT", "1");
+    client.Timeout = TimeSpan.FromSeconds(60);
+});
+builder.Services.AddHttpClient("keeptrack", client =>
+{
+    client.DefaultRequestHeaders.UserAgent.ParseAdd(
+        "MissionClear/1.0 (+https://github.com/fiap/missionclear; contact: guss.badass@gmail.com)");
+    client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+    client.Timeout = TimeSpan.FromSeconds(10);
+});
 
 // ── Repositories (Scoped — EF Core DbContext lifecycle) ───────────────────────
 builder.Services.AddScoped<IUserRepository,         UserRepository>();

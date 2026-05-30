@@ -8,10 +8,15 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<UserEntity> Users => Set<UserEntity>();
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
     public DbSet<MissionEntity> Missions => Set<MissionEntity>();
+    public DbSet<OrbitalObjectEntity> OrbitalObjects => Set<OrbitalObjectEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
+
+        // Seed 300+ Orbital Objects
+        var seed = GenerateSeedData();
+        modelBuilder.Entity<OrbitalObjectEntity>().HasData(seed);
 
         // User indexes
         modelBuilder.Entity<UserEntity>(entity =>
@@ -36,5 +41,29 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
         // Index p/ busca rápida de tokens
         modelBuilder.Entity<RefreshTokenEntity>()
             .HasIndex(rt => rt.Token);
+    }
+
+    private static List<OrbitalObjectEntity> GenerateSeedData()
+    {
+        var random = new Random(42); // Seed fixa para reprodutibilidade
+        var list = new List<OrbitalObjectEntity>();
+        var now = new DateTime(2026, 05, 29, 0, 0, 0, DateTimeKind.Utc);
+
+        for (int i = 1; i <= 350; i++)
+        {
+            list.Add(new OrbitalObjectEntity
+            {
+                Id            = $"SEED_{i:D5}",
+                Name          = $"Debris MC-{i}",
+                Type          = i % 10 == 0 ? "rocket_body" : i % 5 == 0 ? "satellite" : "debris",
+                Latitude      = (random.NextDouble() * 180.0) - 90.0,
+                Longitude     = (random.NextDouble() * 360.0) - 180.0,
+                AltitudeKm    = 300.0 + (random.NextDouble() * 1200.0), // 300km - 1500km
+                VelocityKmS   = 7.0 + (random.NextDouble() * 1.5),      // 7.0 - 8.5 km/s
+                Source        = "local_seed",
+                UpdatedAt     = now
+            });
+        }
+        return list;
     }
 }

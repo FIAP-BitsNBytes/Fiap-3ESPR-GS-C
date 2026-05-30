@@ -15,15 +15,30 @@ public sealed class RefreshTokenRepository(AppDbContext context) : IRefreshToken
         await context.RefreshTokens.AddAsync(token, ct);
     }
 
+    public async Task RevokeByTokenAsync(string token, CancellationToken ct = default)
+    {
+        var rt = await context.RefreshTokens.FirstOrDefaultAsync(r => r.Token == token, ct);
+        if (rt != null)
+        {
+            rt.IsRevoked = true;
+            await context.SaveChangesAsync(ct);
+        }
+    }
+
     public async Task RevokeAllFromUserAsync(Guid userId, CancellationToken ct = default)
     {
         var tokens = await context.RefreshTokens
             .Where(rt => rt.UserId == userId && !rt.IsRevoked)
             .ToListAsync(ct);
 
-        foreach (var token in tokens)
+        foreach (var t in tokens)
         {
-            token.IsRevoked = true;
+            t.IsRevoked = true;
+        }
+
+        if (tokens.Any())
+        {
+            await context.SaveChangesAsync(ct);
         }
     }
 

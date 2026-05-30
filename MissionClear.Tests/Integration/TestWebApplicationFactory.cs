@@ -8,7 +8,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace MissionClear.Tests.Integration;
 
-public sealed class TestWebApplicationFactory : WebApplicationFactory<Program>
+public sealed class TestWebApplicationFactory : WebApplicationFactory<ApiMarker>
 {
     private readonly string _dbName = $"TestDb_{Guid.NewGuid()}";
 

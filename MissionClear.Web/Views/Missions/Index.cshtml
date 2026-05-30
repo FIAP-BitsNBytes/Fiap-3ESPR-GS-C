@@ -1,0 +1,34 @@
+@{ ViewData["Title"] = "Minhas Missões"; }
+
+<h1>Histórico de Missões</h1>
+
+<div class="card">
+    <form method="get" style="display:flex;gap:1rem;align-items:flex-end">
+        <div style="flex:1">
+            <label>Filtrar por status</label>
+            <select name="status">
+                @{
+                    string sSelected = ViewBag.StatusFilter == "success" ? "selected" : "";
+                    string fSelected = ViewBag.StatusFilter == "failure" ? "selected" : "";
+                    string aSelected = ViewBag.StatusFilter == "aborted" ? "selected" : "";
+                    string tSelected = string.IsNullOrEmpty(ViewBag.StatusFilter) ? "selected" : "";
+                }
+                <!option value="" @tSelected>Todos</!option>
+                <!option value="success" @sSelected>Sucesso</!option>
+                <!option value="failure" @fSelected>Falha</!option>
+                <!option value="aborted" @aSelected>Abortado</!option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary">Filtrar</button>
+    </form>
+</div>
+
+@{
+    if (ViewBag.MissionsJson is System.Text.Json.JsonElement json &&
+        json.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+    {
+        int total = 0;
+        try { total = json.GetProperty("pagination").GetProperty("total").GetInt32(); } catch { }
+        <p style="color:#aaa;font-size:.85rem">@total missões no total.</p>
+    }
+}

@@ -1,0 +1,22 @@
+@model RegisterViewModel
+@{ ViewData["Title"] = "Registrar"; }
+
+<div class="card" style="max-width:400px;margin:2rem auto">
+    <h2>Criar Conta</h2>
+    @if (!string.IsNullOrEmpty(Model.Error))
+    {
+        <div class="error">@Model.Error</div>
+    }
+    <form asp-action="Register" method="post">
+        <label>Nome</label>
+        <input asp-for="DisplayName" placeholder="Piloto Guss" />
+        <label>Email</label>
+        <input asp-for="Email" type="email" placeholder="piloto@missao.com" />
+        <label>Senha (mín. 8 chars, 1 maiúscula, 1 número)</label>
+        <input asp-for="Password" type="password" placeholder="••••••••" />
+        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.5rem">Registrar</button>
+    </form>
+    <p style="margin-top:1rem;color:#aaa;font-size:.9rem">
+        Já tem conta? <a asp-action="Login">Entrar</a>
+    </p>
+</div>

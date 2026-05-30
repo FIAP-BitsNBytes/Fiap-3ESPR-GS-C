@@ -6,6 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace MissionClear.Api.Controllers;
 
+[Route("api/launch-windows")]
 public sealed class LaunchWindowsController(
     ILaunchWindowCalculator calculator,
     IOrbitalCache           cache) : BaseApiController

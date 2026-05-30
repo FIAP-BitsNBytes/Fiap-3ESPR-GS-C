@@ -1,20 +1,20 @@
 # Prompt Padrão — Implementar Plano
 
-> Copie este prompt, substitua `{{plan-01-database}}` pelo caminho do plano (ex: `plan-03-orbital`) e envie.
+> Copie este prompt, substitua `{{plan-08-mvc-web}}` pelo caminho do plano (ex: `plan-08-mvc-web`) e envie.
 
 ---
 
 ## PROMPT
 
 ```
-Implemente o plano `docs/superpowers/plans/{{plan-01-database}}.md` **completo e funcionando**.
+Implemente o plano `docs/superpowers/plans/{{plan-08-mvc-web}}.md` **completo e funcionando**.
 
 ## Contexto obrigatório — leia ANTES de tocar qualquer arquivo
 
 1. `CLAUDE.md` — regras do projeto, stack, não-negociáveis
 2. `docs/API_CONTRACT.md` — contratos de resposta e campos (fonte de verdade)
 3. `docs/superpowers/plans/architecture-overview.md` — mapa de arquivos e módulos
-4. `docs/superpowers/plans/{{plan-01-database}}.md` — o que implementar (siga à risca)
+4. `docs/superpowers/plans/{{plan-08-mvc-web}}.md` — o que implementar (siga à risca)
 
 ## Regras de execução
 
@@ -114,13 +114,13 @@ Tipos: feat, fix, refactor, test, chore
 
 **Plan 03 (orbital):**
 ```
-Implemente o plano `docs/superpowers/plans/plan-03-orbital.md` completo e funcionando.
+Implemente o plano `docs/superpowers/plans/plan-08-mvc-web.md` completo e funcionando.
 [...resto do prompt acima...]
 ```
 
 **Plan 04 (auth):**
 ```
-Implemente o plano `docs/superpowers/plans/plan-04-auth.md` completo e funcionando.
+Implemente o plano `docs/superpowers/plans/plan-08-mvc-web.md` completo e funcionando.
 [...resto do prompt acima...]
 ```
 
@@ -130,11 +130,11 @@ Implemente o plano `docs/superpowers/plans/plan-04-auth.md` completo e funcionan
 
 | Variável | Valor exemplo |
 |---|---|
-| `{{plan-01-database}}` | `plan-03-orbital` |
-| `{{plan-01-database}}` | `plan-04-auth` |
-| `{{plan-01-database}}` | `plan-05-simulation` |
-| `{{plan-01-database}}` | `plan-06-history-dashboard` |
-| `{{plan-01-database}}` | `plan-07-controllers` |
-| `{{plan-01-database}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
+| `{{plan-08-mvc-web}}` | `plan-08-mvc-web` |
 
 > Plans 00, 01 e 02 têm regras especiais de arquivo exclusivo — leia o `parallel-execution-guide.md` antes de rodar em paralelo.

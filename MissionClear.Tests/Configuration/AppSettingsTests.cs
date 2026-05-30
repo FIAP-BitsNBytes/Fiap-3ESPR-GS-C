@@ -46,18 +46,27 @@ public class AppSettingsTests
     }
 
     [Fact]
-    public void ExternalApiSettings_BindsCelesTrakUrl()
+    public void ExternalApiSettings_DefaultCatalogsContainDebrisAndOperationalGroups()
+    {
+        var settings = new ExternalApiSettings();
+
+        settings.CelesTrakCatalogs.Should().NotBeEmpty();
+        settings.CelesTrakCatalogs.Should().Contain(c => c.Label.Contains("debris"));
+        settings.CelesTrakCatalogs.Should().OnlyContain(c => c.Url.Contains("celestrak.org"));
+        settings.CelesTrakCatalogs.Should().OnlyContain(c => c.Url.Contains("FORMAT=tle"));
+    }
+
+    [Fact]
+    public void ExternalApiSettings_BindsKeepTrackApiKey()
     {
         var config = BuildConfig(new()
         {
-            ["ExternalApi:CelesTrakBaseUrl"] = "https://celestrak.org/test",
-            ["ExternalApi:KeepTrackApiKey"] = ""
+            ["ExternalApi:KeepTrackApiKey"] = "my-key"
         });
 
         var settings = config.GetSection(ExternalApiSettings.SectionName).Get<ExternalApiSettings>()!;
 
-        settings.CelesTrakBaseUrl.Should().Be("https://celestrak.org/test");
-        settings.KeepTrackApiKey.Should().BeEmpty();
+        settings.KeepTrackApiKey.Should().Be("my-key");
     }
 
     [Fact]

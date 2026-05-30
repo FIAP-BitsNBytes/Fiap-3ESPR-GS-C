@@ -1,0 +1,60 @@
+@model DashboardViewModel
+@{ ViewData["Title"] = "Dashboard"; }
+
+<h1>Dashboard Orbital</h1>
+
+<div class="card">
+    <h3>Detritos Rastreados</h3>
+    <div>
+        <span class="stat">
+            <span class="stat-value">@Model.TotalTrackedObjects.ToString("N0")</span>
+            <br/><span class="stat-label">Total</span>
+        </span>
+        <span class="stat">
+            <span class="stat-value" style="color:#ff8888">@Model.Debris.ToString("N0")</span>
+            <br/><span class="stat-label">Detritos</span>
+        </span>
+        <span class="stat">
+            <span class="stat-value" style="color:#88ff88">@Model.Satellites.ToString("N0")</span>
+            <br/><span class="stat-label">Satélites</span>
+        </span>
+        <span class="stat">
+            <span class="stat-value" style="color:#ffaa88">@Model.RocketBodies.ToString("N0")</span>
+            <br/><span class="stat-label">Estágios de Foguete</span>
+        </span>
+        <span class="stat">
+            <span class="stat-value" style="color:@(Model.ActiveAlerts > 0 ? "#ff4444" : "#44ff88")">@Model.ActiveAlerts</span>
+            <br/><span class="stat-label">Alertas Ativos</span>
+        </span>
+    </div>
+    @if (!string.IsNullOrEmpty(Model.LastUpdated))
+    {
+        <p style="color:#666;font-size:.8rem;margin-top:1rem">Última atualização: @Model.LastUpdated</p>
+    }
+</div>
+
+@if (!string.IsNullOrEmpty(Model.UserDisplayName))
+{
+    <div class="card">
+        <h3>Suas Estatísticas — @Model.UserDisplayName</h3>
+        <div>
+            <span class="stat">
+                <span class="stat-value">@Model.UserTotalMissions</span>
+                <br/><span class="stat-label">Missões</span>
+            </span>
+            <span class="stat">
+                <span class="stat-value" style="color:#ffd700">@Model.UserBestScore</span>
+                <br/><span class="stat-label">Melhor Score</span>
+            </span>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card">
+        <p>
+            <a asp-controller="Auth" asp-action="Login">Faça login</a>
+            para ver suas estatísticas de missão.
+        </p>
+    </div>
+}

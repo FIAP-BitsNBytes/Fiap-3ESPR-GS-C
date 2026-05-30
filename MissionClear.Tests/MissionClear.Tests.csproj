@@ -25,5 +25,6 @@
 
   <ItemGroup>
     <ProjectReference Include="..\MissionClear.Api\MissionClear.Api.csproj" />
+    <ProjectReference Include="..\MissionClear.Web\MissionClear.Web.csproj" />
   </ItemGroup>
 </Project>

@@ -17,7 +17,7 @@ namespace MissionClear.Api.Data.Migrations
         {
 #pragma warning disable 612, 618
             modelBuilder
-                .HasAnnotation("ProductVersion", "8.0.12")
+                .HasAnnotation("ProductVersion", "9.0.0")
                 .HasAnnotation("Relational:MaxIdentifierLength", 64);
 
             MySqlModelBuilderExtensions.AutoIncrementColumns(modelBuilder);
@@ -84,6 +84,4268 @@ namespace MissionClear.Api.Data.Migrations
                     b.HasIndex("UserId");
 
                     b.ToTable("missions");
+                });
+
+            modelBuilder.Entity("MissionClear.Api.Entities.OrbitalObjectEntity", b =>
+                {
+                    b.Property<string>("Id")
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("id");
+
+                    b.Property<double>("AltitudeKm")
+                        .HasColumnType("double")
+                        .HasColumnName("altitude_km");
+
+                    b.Property<double>("Latitude")
+                        .HasColumnType("double")
+                        .HasColumnName("latitude");
+
+                    b.Property<double>("Longitude")
+                        .HasColumnType("double")
+                        .HasColumnName("longitude");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("name");
+
+                    b.Property<string>("Source")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("source");
+
+                    b.Property<string>("TleLine1")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("tle_line1");
+
+                    b.Property<string>("TleLine2")
+                        .HasMaxLength(100)
+                        .HasColumnType("varchar(100)")
+                        .HasColumnName("tle_line2");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("varchar(50)")
+                        .HasColumnName("type");
+
+                    b.Property<DateTime>("UpdatedAt")
+                        .HasColumnType("datetime(6)")
+                        .HasColumnName("updated_at");
+
+                    b.Property<double>("VelocityKmS")
+                        .HasColumnType("double")
+                        .HasColumnName("velocity_km_s");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("orbital_objects");
+
+                    b.HasData(
+                        new
+                        {
+                            Id = "SEED_00001",
+                            AltitudeKm = 450.62194734375078,
+                            Latitude = 30.259163864077621,
+                            Longitude = -129.27337258554687,
+                            Name = "Debris MC-1",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7841464140378616
+                        },
+                        new
+                        {
+                            Id = "SEED_00002",
+                            AltitudeKm = 1169.2900376717048,
+                            Latitude = -59.68183964941737,
+                            Longitude = -85.466636896816382,
+                            Name = "Debris MC-2",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7693841873059908
+                        },
+                        new
+                        {
+                            Id = "SEED_00003",
+                            AltitudeKm = 581.50614997442165,
+                            Latitude = -58.742789304229802,
+                            Longitude = 94.050201118947086,
+                            Name = "Debris MC-3",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3859820968406193
+                        },
+                        new
+                        {
+                            Id = "SEED_00004",
+                            AltitudeKm = 757.16353620270434,
+                            Latitude = 1.0086380369070156,
+                            Longitude = -64.716052564194442,
+                            Name = "Debris MC-4",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3903669525824336
+                        },
+                        new
+                        {
+                            Id = "SEED_00005",
+                            AltitudeKm = 1276.9648509924136,
+                            Latitude = 3.1411979688057556,
+                            Longitude = -167.28522570211683,
+                            Name = "Debris MC-5",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8657952809547051
+                        },
+                        new
+                        {
+                            Id = "SEED_00006",
+                            AltitudeKm = 408.13513235567842,
+                            Latitude = -18.455307478297186,
+                            Longitude = -125.21049111392838,
+                            Name = "Debris MC-6",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.057728195124179
+                        },
+                        new
+                        {
+                            Id = "SEED_00007",
+                            AltitudeKm = 352.9765656464624,
+                            Latitude = 56.912750949576832,
+                            Longitude = 14.389409569273425,
+                            Name = "Debris MC-7",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0667318846409817
+                        },
+                        new
+                        {
+                            Id = "SEED_00008",
+                            AltitudeKm = 1131.1076674755232,
+                            Latitude = -63.402972069290918,
+                            Longitude = 146.23659346543093,
+                            Name = "Debris MC-8",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7746205710687768
+                        },
+                        new
+                        {
+                            Id = "SEED_00009",
+                            AltitudeKm = 669.83959543045592,
+                            Latitude = -56.451877870807365,
+                            Longitude = -165.05641210128385,
+                            Name = "Debris MC-9",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8747404298627472
+                        },
+                        new
+                        {
+                            Id = "SEED_00010",
+                            AltitudeKm = 942.86642495676244,
+                            Latitude = 57.791727356515707,
+                            Longitude = -178.5762500942574,
+                            Name = "Debris MC-10",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2077767000104185
+                        },
+                        new
+                        {
+                            Id = "SEED_00011",
+                            AltitudeKm = 478.94288607823796,
+                            Latitude = 44.704606875174022,
+                            Longitude = -41.55347098668733,
+                            Name = "Debris MC-11",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0395092712899245
+                        },
+                        new
+                        {
+                            Id = "SEED_00012",
+                            AltitudeKm = 1051.7476612477321,
+                            Latitude = -80.818378352941195,
+                            Longitude = 101.39144994383281,
+                            Name = "Debris MC-12",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.172764557028545
+                        },
+                        new
+                        {
+                            Id = "SEED_00013",
+                            AltitudeKm = 647.52801468015093,
+                            Latitude = -45.007050919815455,
+                            Longitude = 98.074196762439897,
+                            Name = "Debris MC-13",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9722188610919842
+                        },
+                        new
+                        {
+                            Id = "SEED_00014",
+                            AltitudeKm = 1025.4711407821023,
+                            Latitude = -64.143632740780532,
+                            Longitude = -163.98059147595455,
+                            Name = "Debris MC-14",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7738700785086818
+                        },
+                        new
+                        {
+                            Id = "SEED_00015",
+                            AltitudeKm = 1147.8987915664438,
+                            Latitude = -80.856956146125199,
+                            Longitude = -28.668182626677748,
+                            Name = "Debris MC-15",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9426954630495494
+                        },
+                        new
+                        {
+                            Id = "SEED_00016",
+                            AltitudeKm = 738.19383030673202,
+                            Latitude = -50.679803295377553,
+                            Longitude = -175.22864101232432,
+                            Name = "Debris MC-16",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4011576163587893
+                        },
+                        new
+                        {
+                            Id = "SEED_00017",
+                            AltitudeKm = 385.13152994454447,
+                            Latitude = -77.641049561854942,
+                            Longitude = 78.542907935819983,
+                            Name = "Debris MC-17",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6961403673962412
+                        },
+                        new
+                        {
+                            Id = "SEED_00018",
+                            AltitudeKm = 827.01537968917535,
+                            Latitude = -87.833965596665607,
+                            Longitude = 107.21135769375201,
+                            Name = "Debris MC-18",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7702443584661207
+                        },
+                        new
+                        {
+                            Id = "SEED_00019",
+                            AltitudeKm = 1294.605512262604,
+                            Latitude = -0.072576594572780095,
+                            Longitude = -176.77695270477653,
+                            Name = "Debris MC-19",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0193452334587203
+                        },
+                        new
+                        {
+                            Id = "SEED_00020",
+                            AltitudeKm = 1084.9717451189513,
+                            Latitude = -89.446678468699886,
+                            Longitude = -157.04168540287841,
+                            Name = "Debris MC-20",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0518085498138374
+                        },
+                        new
+                        {
+                            Id = "SEED_00021",
+                            AltitudeKm = 853.43251384488894,
+                            Latitude = 74.43255559747692,
+                            Longitude = 154.42947600708783,
+                            Name = "Debris MC-21",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5629994129124096
+                        },
+                        new
+                        {
+                            Id = "SEED_00022",
+                            AltitudeKm = 747.32067512689196,
+                            Latitude = 20.989094530692824,
+                            Longitude = -164.00022641941916,
+                            Name = "Debris MC-22",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2128201488930825
+                        },
+                        new
+                        {
+                            Id = "SEED_00023",
+                            AltitudeKm = 938.838718197699,
+                            Latitude = -11.348877167957312,
+                            Longitude = 105.22305978705322,
+                            Name = "Debris MC-23",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6010484889154544
+                        },
+                        new
+                        {
+                            Id = "SEED_00024",
+                            AltitudeKm = 1004.0867153108524,
+                            Latitude = -36.4729437820953,
+                            Longitude = 146.61301635513689,
+                            Name = "Debris MC-24",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1026577281778014
+                        },
+                        new
+                        {
+                            Id = "SEED_00025",
+                            AltitudeKm = 1449.2144141109727,
+                            Latitude = -86.505810039353463,
+                            Longitude = 137.40503789736192,
+                            Name = "Debris MC-25",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4992513973262405
+                        },
+                        new
+                        {
+                            Id = "SEED_00026",
+                            AltitudeKm = 423.77141626727371,
+                            Latitude = 37.925995480234732,
+                            Longitude = -121.5493898007783,
+                            Name = "Debris MC-26",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6782272519442376
+                        },
+                        new
+                        {
+                            Id = "SEED_00027",
+                            AltitudeKm = 478.25893283740572,
+                            Latitude = -30.015208572156361,
+                            Longitude = 99.399758372176336,
+                            Name = "Debris MC-27",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.202040363430064
+                        },
+                        new
+                        {
+                            Id = "SEED_00028",
+                            AltitudeKm = 915.40725259827786,
+                            Latitude = -51.181122577367873,
+                            Longitude = 32.998486204537784,
+                            Name = "Debris MC-28",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4805323879609507
+                        },
+                        new
+                        {
+                            Id = "SEED_00029",
+                            AltitudeKm = 1157.9393331231267,
+                            Latitude = 47.920146918818403,
+                            Longitude = 61.935585514612313,
+                            Name = "Debris MC-29",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4342121558423209
+                        },
+                        new
+                        {
+                            Id = "SEED_00030",
+                            AltitudeKm = 1080.9987962157461,
+                            Latitude = 9.3708024171045139,
+                            Longitude = 176.33828999304131,
+                            Name = "Debris MC-30",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0363255303987886
+                        },
+                        new
+                        {
+                            Id = "SEED_00031",
+                            AltitudeKm = 332.57147503670842,
+                            Latitude = -27.826647301123785,
+                            Longitude = 154.46262324902352,
+                            Name = "Debris MC-31",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3296208709150648
+                        },
+                        new
+                        {
+                            Id = "SEED_00032",
+                            AltitudeKm = 559.34844532019849,
+                            Latitude = -42.220128882778873,
+                            Longitude = -166.14702343295656,
+                            Name = "Debris MC-32",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8885076268988232
+                        },
+                        new
+                        {
+                            Id = "SEED_00033",
+                            AltitudeKm = 1492.1815870293331,
+                            Latitude = -14.001483649016109,
+                            Longitude = -146.2562010838912,
+                            Name = "Debris MC-33",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1820900215218266
+                        },
+                        new
+                        {
+                            Id = "SEED_00034",
+                            AltitudeKm = 688.60686998283813,
+                            Latitude = -70.903004818085122,
+                            Longitude = -64.328811822612224,
+                            Name = "Debris MC-34",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1267270874822177
+                        },
+                        new
+                        {
+                            Id = "SEED_00035",
+                            AltitudeKm = 350.50092081097,
+                            Latitude = 58.649025563452852,
+                            Longitude = -176.74478631315046,
+                            Name = "Debris MC-35",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2607434612050383
+                        },
+                        new
+                        {
+                            Id = "SEED_00036",
+                            AltitudeKm = 1411.4636029635853,
+                            Latitude = 71.261046864679571,
+                            Longitude = -94.293484685147874,
+                            Name = "Debris MC-36",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2679323310814485
+                        },
+                        new
+                        {
+                            Id = "SEED_00037",
+                            AltitudeKm = 1061.3711450069077,
+                            Latitude = -39.699557996215098,
+                            Longitude = 16.323842348681694,
+                            Name = "Debris MC-37",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9379938621716546
+                        },
+                        new
+                        {
+                            Id = "SEED_00038",
+                            AltitudeKm = 519.65416642821128,
+                            Latitude = -55.384391790900558,
+                            Longitude = -72.984902808901353,
+                            Name = "Debris MC-38",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0443753747010485
+                        },
+                        new
+                        {
+                            Id = "SEED_00039",
+                            AltitudeKm = 1484.9120998684839,
+                            Latitude = -48.447300483680934,
+                            Longitude = 156.04619693758252,
+                            Name = "Debris MC-39",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1724556987976911
+                        },
+                        new
+                        {
+                            Id = "SEED_00040",
+                            AltitudeKm = 524.04932744058283,
+                            Latitude = -65.660416155895405,
+                            Longitude = 138.02241586056653,
+                            Name = "Debris MC-40",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4421525262026824
+                        },
+                        new
+                        {
+                            Id = "SEED_00041",
+                            AltitudeKm = 1154.9755150708256,
+                            Latitude = 10.797612388058397,
+                            Longitude = 20.235849395504175,
+                            Name = "Debris MC-41",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1828914830381478
+                        },
+                        new
+                        {
+                            Id = "SEED_00042",
+                            AltitudeKm = 1357.1126091559941,
+                            Latitude = 17.67200504786895,
+                            Longitude = -39.079429385754963,
+                            Name = "Debris MC-42",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6673712735843713
+                        },
+                        new
+                        {
+                            Id = "SEED_00043",
+                            AltitudeKm = 856.37622091750438,
+                            Latitude = -27.323237740119559,
+                            Longitude = 166.96729894120585,
+                            Name = "Debris MC-43",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8145266297806648
+                        },
+                        new
+                        {
+                            Id = "SEED_00044",
+                            AltitudeKm = 453.98677855450046,
+                            Latitude = 80.594006874875163,
+                            Longitude = 111.72120817551445,
+                            Name = "Debris MC-44",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1610007920120848
+                        },
+                        new
+                        {
+                            Id = "SEED_00045",
+                            AltitudeKm = 1428.3604167068193,
+                            Latitude = -89.488228820026023,
+                            Longitude = -114.53231694853507,
+                            Name = "Debris MC-45",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0801495828573362
+                        },
+                        new
+                        {
+                            Id = "SEED_00046",
+                            AltitudeKm = 780.03538012506226,
+                            Latitude = -17.279183467514429,
+                            Longitude = 32.686006674862483,
+                            Name = "Debris MC-46",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1874247312952884
+                        },
+                        new
+                        {
+                            Id = "SEED_00047",
+                            AltitudeKm = 1368.6540204420007,
+                            Latitude = 73.923774493822719,
+                            Longitude = 167.00438618054818,
+                            Name = "Debris MC-47",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2589491392760301
+                        },
+                        new
+                        {
+                            Id = "SEED_00048",
+                            AltitudeKm = 1039.1177776917434,
+                            Latitude = -29.901220891578696,
+                            Longitude = 15.192693283405504,
+                            Name = "Debris MC-48",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4136484802764144
+                        },
+                        new
+                        {
+                            Id = "SEED_00049",
+                            AltitudeKm = 636.6106863769752,
+                            Latitude = 58.02020772733735,
+                            Longitude = 89.033669954647166,
+                            Name = "Debris MC-49",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5095260180577288
+                        },
+                        new
+                        {
+                            Id = "SEED_00050",
+                            AltitudeKm = 596.53249787936568,
+                            Latitude = 4.6069303968022268,
+                            Longitude = 109.54512495992014,
+                            Name = "Debris MC-50",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3320013058055196
+                        },
+                        new
+                        {
+                            Id = "SEED_00051",
+                            AltitudeKm = 632.5500080047874,
+                            Latitude = 29.595029800941717,
+                            Longitude = -111.75776215817675,
+                            Name = "Debris MC-51",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.342766322820804
+                        },
+                        new
+                        {
+                            Id = "SEED_00052",
+                            AltitudeKm = 398.20692059500465,
+                            Latitude = 60.051115457923657,
+                            Longitude = 50.409858781103907,
+                            Name = "Debris MC-52",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6307674619046821
+                        },
+                        new
+                        {
+                            Id = "SEED_00053",
+                            AltitudeKm = 1234.55275117166,
+                            Latitude = 54.925081685616192,
+                            Longitude = 136.83343987764482,
+                            Name = "Debris MC-53",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4300478526531002
+                        },
+                        new
+                        {
+                            Id = "SEED_00054",
+                            AltitudeKm = 1368.9165774122423,
+                            Latitude = 79.757145424260358,
+                            Longitude = -12.021101653585731,
+                            Name = "Debris MC-54",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4537884087552264
+                        },
+                        new
+                        {
+                            Id = "SEED_00055",
+                            AltitudeKm = 553.48802313836666,
+                            Latitude = -61.887382321007266,
+                            Longitude = 31.510719010378551,
+                            Name = "Debris MC-55",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9514150996466242
+                        },
+                        new
+                        {
+                            Id = "SEED_00056",
+                            AltitudeKm = 433.2384914780215,
+                            Latitude = 0.16218224082243182,
+                            Longitude = 74.985989320551028,
+                            Name = "Debris MC-56",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2090034634848141
+                        },
+                        new
+                        {
+                            Id = "SEED_00057",
+                            AltitudeKm = 1164.819918975616,
+                            Latitude = -27.384017183158555,
+                            Longitude = 7.6372310089120674,
+                            Name = "Debris MC-57",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3006430991462636
+                        },
+                        new
+                        {
+                            Id = "SEED_00058",
+                            AltitudeKm = 998.08776429765294,
+                            Latitude = 5.3690011312109505,
+                            Longitude = 103.90978923249514,
+                            Name = "Debris MC-58",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2978267391667826
+                        },
+                        new
+                        {
+                            Id = "SEED_00059",
+                            AltitudeKm = 366.8194676129238,
+                            Latitude = 78.253966843827612,
+                            Longitude = -161.17218838127897,
+                            Name = "Debris MC-59",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3216641467631165
+                        },
+                        new
+                        {
+                            Id = "SEED_00060",
+                            AltitudeKm = 649.59901531673927,
+                            Latitude = -33.539497863286876,
+                            Longitude = -118.25330343947434,
+                            Name = "Debris MC-60",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4059903758605898
+                        },
+                        new
+                        {
+                            Id = "SEED_00061",
+                            AltitudeKm = 740.99210018338272,
+                            Latitude = 68.771155001023402,
+                            Longitude = -10.787984724523483,
+                            Name = "Debris MC-61",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6806838264133237
+                        },
+                        new
+                        {
+                            Id = "SEED_00062",
+                            AltitudeKm = 1499.2044813927284,
+                            Latitude = 47.413433965953743,
+                            Longitude = 58.523848670778705,
+                            Name = "Debris MC-62",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5335896546177521
+                        },
+                        new
+                        {
+                            Id = "SEED_00063",
+                            AltitudeKm = 520.20336325289838,
+                            Latitude = 64.179348365487215,
+                            Longitude = -67.926012188161735,
+                            Name = "Debris MC-63",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4070964240967747
+                        },
+                        new
+                        {
+                            Id = "SEED_00064",
+                            AltitudeKm = 764.51982970559959,
+                            Latitude = 16.749359009205051,
+                            Longitude = 40.620125448620001,
+                            Name = "Debris MC-64",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.434183626172219
+                        },
+                        new
+                        {
+                            Id = "SEED_00065",
+                            AltitudeKm = 1356.7731728110336,
+                            Latitude = -75.864654800791598,
+                            Longitude = -10.395828834919172,
+                            Name = "Debris MC-65",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4686041662788973
+                        },
+                        new
+                        {
+                            Id = "SEED_00066",
+                            AltitudeKm = 1368.820628649006,
+                            Latitude = 75.481941544209576,
+                            Longitude = 137.30773238339822,
+                            Name = "Debris MC-66",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0247515589114053
+                        },
+                        new
+                        {
+                            Id = "SEED_00067",
+                            AltitudeKm = 322.34516983029675,
+                            Latitude = -36.296444705825508,
+                            Longitude = 28.887407951470209,
+                            Name = "Debris MC-67",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3361936634574985
+                        },
+                        new
+                        {
+                            Id = "SEED_00068",
+                            AltitudeKm = 1086.6273794260935,
+                            Latitude = -16.033470968731436,
+                            Longitude = 63.47557800052482,
+                            Name = "Debris MC-68",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4769939116560824
+                        },
+                        new
+                        {
+                            Id = "SEED_00069",
+                            AltitudeKm = 1202.6577130438097,
+                            Latitude = -36.684492792321599,
+                            Longitude = 158.60871673496843,
+                            Name = "Debris MC-69",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0463014550257013
+                        },
+                        new
+                        {
+                            Id = "SEED_00070",
+                            AltitudeKm = 351.11321101482639,
+                            Latitude = -28.655820367231883,
+                            Longitude = 56.607429104208677,
+                            Name = "Debris MC-70",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0279504873454339
+                        },
+                        new
+                        {
+                            Id = "SEED_00071",
+                            AltitudeKm = 712.65215688042917,
+                            Latitude = 3.9379432955467877,
+                            Longitude = -48.615541415575677,
+                            Name = "Debris MC-71",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3277667268774316
+                        },
+                        new
+                        {
+                            Id = "SEED_00072",
+                            AltitudeKm = 1026.5989979387257,
+                            Latitude = 18.924390128312808,
+                            Longitude = 51.723187506069991,
+                            Name = "Debris MC-72",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4828658676626469
+                        },
+                        new
+                        {
+                            Id = "SEED_00073",
+                            AltitudeKm = 463.09568274910362,
+                            Latitude = 29.735931353520556,
+                            Longitude = -144.15822999745524,
+                            Name = "Debris MC-73",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2638201379514395
+                        },
+                        new
+                        {
+                            Id = "SEED_00074",
+                            AltitudeKm = 721.57935706040792,
+                            Latitude = -37.642627641392238,
+                            Longitude = 172.41470468808649,
+                            Name = "Debris MC-74",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0009774067443686
+                        },
+                        new
+                        {
+                            Id = "SEED_00075",
+                            AltitudeKm = 486.52335916949596,
+                            Latitude = 14.282913340387353,
+                            Longitude = -53.642744083722476,
+                            Name = "Debris MC-75",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2747477499184887
+                        },
+                        new
+                        {
+                            Id = "SEED_00076",
+                            AltitudeKm = 1433.7615301524111,
+                            Latitude = 25.910148860844842,
+                            Longitude = -140.9251348119812,
+                            Name = "Debris MC-76",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2703463280435399
+                        },
+                        new
+                        {
+                            Id = "SEED_00077",
+                            AltitudeKm = 1070.2404245595635,
+                            Latitude = 28.042886992005123,
+                            Longitude = -108.41752982159031,
+                            Name = "Debris MC-77",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9787083386810069
+                        },
+                        new
+                        {
+                            Id = "SEED_00078",
+                            AltitudeKm = 1038.3857033859872,
+                            Latitude = 64.911405767738529,
+                            Longitude = -51.756400294488486,
+                            Name = "Debris MC-78",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6319302553925343
+                        },
+                        new
+                        {
+                            Id = "SEED_00079",
+                            AltitudeKm = 1248.6303777194721,
+                            Latitude = -12.864896069683553,
+                            Longitude = -109.67616511959405,
+                            Name = "Debris MC-79",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8315809354333119
+                        },
+                        new
+                        {
+                            Id = "SEED_00080",
+                            AltitudeKm = 793.63864627370549,
+                            Latitude = 6.756042659634744,
+                            Longitude = 61.982174144118176,
+                            Name = "Debris MC-80",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9820163461761631
+                        },
+                        new
+                        {
+                            Id = "SEED_00081",
+                            AltitudeKm = 570.71538840919516,
+                            Latitude = 85.453854284926251,
+                            Longitude = 70.815742710053797,
+                            Name = "Debris MC-81",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4670470335833015
+                        },
+                        new
+                        {
+                            Id = "SEED_00082",
+                            AltitudeKm = 1132.5459802674809,
+                            Latitude = 7.2734365878968532,
+                            Longitude = 112.67138071948261,
+                            Name = "Debris MC-82",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4759012905302926
+                        },
+                        new
+                        {
+                            Id = "SEED_00083",
+                            AltitudeKm = 841.82174175131217,
+                            Latitude = 16.067454808423051,
+                            Longitude = 90.562736294494357,
+                            Name = "Debris MC-83",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4847129306219102
+                        },
+                        new
+                        {
+                            Id = "SEED_00084",
+                            AltitudeKm = 349.62606413738155,
+                            Latitude = 0.32521067667995851,
+                            Longitude = 129.39450332401066,
+                            Name = "Debris MC-84",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6200042558461449
+                        },
+                        new
+                        {
+                            Id = "SEED_00085",
+                            AltitudeKm = 975.26080155524471,
+                            Latitude = -14.372000230649491,
+                            Longitude = -121.08747166632091,
+                            Name = "Debris MC-85",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6094429586592334
+                        },
+                        new
+                        {
+                            Id = "SEED_00086",
+                            AltitudeKm = 853.54998901186048,
+                            Latitude = -89.674469930899548,
+                            Longitude = 163.08969809817603,
+                            Name = "Debris MC-86",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4634510958397069
+                        },
+                        new
+                        {
+                            Id = "SEED_00087",
+                            AltitudeKm = 796.82208415904176,
+                            Latitude = -2.836970506625704,
+                            Longitude = 77.265443530522987,
+                            Name = "Debris MC-87",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1432954576533731
+                        },
+                        new
+                        {
+                            Id = "SEED_00088",
+                            AltitudeKm = 855.74164099793029,
+                            Latitude = -56.087204313877599,
+                            Longitude = 106.89438261412755,
+                            Name = "Debris MC-88",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3607652189027348
+                        },
+                        new
+                        {
+                            Id = "SEED_00089",
+                            AltitudeKm = 550.10583803528266,
+                            Latitude = 79.132831017082964,
+                            Longitude = 0.27308466856979408,
+                            Name = "Debris MC-89",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4208523125484831
+                        },
+                        new
+                        {
+                            Id = "SEED_00090",
+                            AltitudeKm = 1067.7874851821864,
+                            Latitude = 68.930124332630129,
+                            Longitude = 48.037170985730938,
+                            Name = "Debris MC-90",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2642266386021994
+                        },
+                        new
+                        {
+                            Id = "SEED_00091",
+                            AltitudeKm = 375.85030555531864,
+                            Latitude = 0.90933804908270588,
+                            Longitude = -63.144182359401213,
+                            Name = "Debris MC-91",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1635836468374281
+                        },
+                        new
+                        {
+                            Id = "SEED_00092",
+                            AltitudeKm = 1403.3761331361607,
+                            Latitude = 72.848538590058922,
+                            Longitude = 45.18460766653746,
+                            Name = "Debris MC-92",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8536487689025929
+                        },
+                        new
+                        {
+                            Id = "SEED_00093",
+                            AltitudeKm = 461.07808321764605,
+                            Latitude = -62.281992180404245,
+                            Longitude = -44.211908087233041,
+                            Name = "Debris MC-93",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5608314874399598
+                        },
+                        new
+                        {
+                            Id = "SEED_00094",
+                            AltitudeKm = 1083.4428764802603,
+                            Latitude = -70.298033161227607,
+                            Longitude = -178.1747161961043,
+                            Name = "Debris MC-94",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0325750436319856
+                        },
+                        new
+                        {
+                            Id = "SEED_00095",
+                            AltitudeKm = 1292.5507635774793,
+                            Latitude = -47.62462699675217,
+                            Longitude = 149.98635352122892,
+                            Name = "Debris MC-95",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2386726235219623
+                        },
+                        new
+                        {
+                            Id = "SEED_00096",
+                            AltitudeKm = 454.635727850085,
+                            Latitude = -18.187622264114964,
+                            Longitude = 35.372884243434697,
+                            Name = "Debris MC-96",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1885021958446611
+                        },
+                        new
+                        {
+                            Id = "SEED_00097",
+                            AltitudeKm = 360.21813771697606,
+                            Latitude = -38.079878002442364,
+                            Longitude = 15.962869988737111,
+                            Name = "Debris MC-97",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0015722361866253
+                        },
+                        new
+                        {
+                            Id = "SEED_00098",
+                            AltitudeKm = 936.46924245938158,
+                            Latitude = 27.181375956712927,
+                            Longitude = -146.11673577042143,
+                            Name = "Debris MC-98",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1800784523040413
+                        },
+                        new
+                        {
+                            Id = "SEED_00099",
+                            AltitudeKm = 1381.4921132668351,
+                            Latitude = 4.2881413895115941,
+                            Longitude = 79.163847202045758,
+                            Name = "Debris MC-99",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0158135104066748
+                        },
+                        new
+                        {
+                            Id = "SEED_00100",
+                            AltitudeKm = 785.1039527380392,
+                            Latitude = 70.167303215790213,
+                            Longitude = -53.195078537424592,
+                            Name = "Debris MC-100",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.28808938050088
+                        },
+                        new
+                        {
+                            Id = "SEED_00101",
+                            AltitudeKm = 1429.8496473253936,
+                            Latitude = 53.126301794837389,
+                            Longitude = 124.17092071109028,
+                            Name = "Debris MC-101",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2168229144144913
+                        },
+                        new
+                        {
+                            Id = "SEED_00102",
+                            AltitudeKm = 1257.2657295303725,
+                            Latitude = 29.285478824416856,
+                            Longitude = -147.87706468621133,
+                            Name = "Debris MC-102",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4018349092927931
+                        },
+                        new
+                        {
+                            Id = "SEED_00103",
+                            AltitudeKm = 1154.1793633504674,
+                            Latitude = 62.620110862245838,
+                            Longitude = -112.7862590610917,
+                            Name = "Debris MC-103",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4494745631001305
+                        },
+                        new
+                        {
+                            Id = "SEED_00104",
+                            AltitudeKm = 832.63212597585846,
+                            Latitude = 55.135970956243568,
+                            Longitude = 113.05481590938513,
+                            Name = "Debris MC-104",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3601907993947115
+                        },
+                        new
+                        {
+                            Id = "SEED_00105",
+                            AltitudeKm = 1284.732770819558,
+                            Latitude = -54.767450357213356,
+                            Longitude = -82.485435336122961,
+                            Name = "Debris MC-105",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5405591966307535
+                        },
+                        new
+                        {
+                            Id = "SEED_00106",
+                            AltitudeKm = 1401.7098420773214,
+                            Latitude = 13.55958317572231,
+                            Longitude = 150.63550325605809,
+                            Name = "Debris MC-106",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0898031308733875
+                        },
+                        new
+                        {
+                            Id = "SEED_00107",
+                            AltitudeKm = 1320.0775806885574,
+                            Latitude = 62.423659587476237,
+                            Longitude = -54.895403587676313,
+                            Name = "Debris MC-107",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5843336936479124
+                        },
+                        new
+                        {
+                            Id = "SEED_00108",
+                            AltitudeKm = 458.27801346698686,
+                            Latitude = -71.311175088077405,
+                            Longitude = 171.237620446476,
+                            Name = "Debris MC-108",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3247742689330018
+                        },
+                        new
+                        {
+                            Id = "SEED_00109",
+                            AltitudeKm = 336.76275351865343,
+                            Latitude = 2.2275838499085836,
+                            Longitude = 168.62377775303264,
+                            Name = "Debris MC-109",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8310576448361662
+                        },
+                        new
+                        {
+                            Id = "SEED_00110",
+                            AltitudeKm = 455.56523117961603,
+                            Latitude = 28.208995022908312,
+                            Longitude = -65.646781104452344,
+                            Name = "Debris MC-110",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2988221195055276
+                        },
+                        new
+                        {
+                            Id = "SEED_00111",
+                            AltitudeKm = 483.79038320099488,
+                            Latitude = 44.391575564812683,
+                            Longitude = -138.37493691517736,
+                            Name = "Debris MC-111",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6964542123938227
+                        },
+                        new
+                        {
+                            Id = "SEED_00112",
+                            AltitudeKm = 1476.4896221349434,
+                            Latitude = -21.185272387780842,
+                            Longitude = 23.066877593783147,
+                            Name = "Debris MC-112",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0646727786234926
+                        },
+                        new
+                        {
+                            Id = "SEED_00113",
+                            AltitudeKm = 877.76714404009613,
+                            Latitude = -40.312895295355887,
+                            Longitude = 178.0018421253198,
+                            Name = "Debris MC-113",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9284168406987643
+                        },
+                        new
+                        {
+                            Id = "SEED_00114",
+                            AltitudeKm = 640.07428322922169,
+                            Latitude = 5.6925451083539684,
+                            Longitude = -164.20302136996901,
+                            Name = "Debris MC-114",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3150712513900693
+                        },
+                        new
+                        {
+                            Id = "SEED_00115",
+                            AltitudeKm = 1457.3006009484179,
+                            Latitude = 76.828984043946946,
+                            Longitude = 137.40214278800511,
+                            Name = "Debris MC-115",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4727765051521251
+                        },
+                        new
+                        {
+                            Id = "SEED_00116",
+                            AltitudeKm = 1296.87576135475,
+                            Latitude = -46.950169446389268,
+                            Longitude = -33.060367616387254,
+                            Name = "Debris MC-116",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.308344171991731
+                        },
+                        new
+                        {
+                            Id = "SEED_00117",
+                            AltitudeKm = 844.72909148071381,
+                            Latitude = -80.134831550593873,
+                            Longitude = 118.30798446121997,
+                            Name = "Debris MC-117",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2568673506643933
+                        },
+                        new
+                        {
+                            Id = "SEED_00118",
+                            AltitudeKm = 600.0926726963803,
+                            Latitude = 51.01299492689455,
+                            Longitude = 140.33580303207776,
+                            Name = "Debris MC-118",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3171328349584392
+                        },
+                        new
+                        {
+                            Id = "SEED_00119",
+                            AltitudeKm = 1036.5035202058514,
+                            Latitude = -64.577502345003893,
+                            Longitude = 43.702522564540857,
+                            Name = "Debris MC-119",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6895587636109246
+                        },
+                        new
+                        {
+                            Id = "SEED_00120",
+                            AltitudeKm = 1113.0776539505821,
+                            Latitude = 47.74919414787982,
+                            Longitude = -16.636058351321168,
+                            Name = "Debris MC-120",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4240851732548725
+                        },
+                        new
+                        {
+                            Id = "SEED_00121",
+                            AltitudeKm = 436.21959022070263,
+                            Latitude = -23.92114511407965,
+                            Longitude = -129.49819266307082,
+                            Name = "Debris MC-121",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1640658654105227
+                        },
+                        new
+                        {
+                            Id = "SEED_00122",
+                            AltitudeKm = 721.86911442404107,
+                            Latitude = -1.0462613827764358,
+                            Longitude = 4.6633622723926464,
+                            Name = "Debris MC-122",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.702742454457443
+                        },
+                        new
+                        {
+                            Id = "SEED_00123",
+                            AltitudeKm = 1052.6528889092865,
+                            Latitude = 33.300746392133064,
+                            Longitude = -124.58827427802061,
+                            Name = "Debris MC-123",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1625660302408818
+                        },
+                        new
+                        {
+                            Id = "SEED_00124",
+                            AltitudeKm = 1452.058825247017,
+                            Latitude = -26.418480694488842,
+                            Longitude = 113.2032081173748,
+                            Name = "Debris MC-124",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5076813281083856
+                        },
+                        new
+                        {
+                            Id = "SEED_00125",
+                            AltitudeKm = 791.39558025235101,
+                            Latitude = -38.718832660801162,
+                            Longitude = -78.865486317717227,
+                            Name = "Debris MC-125",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8305061281800761
+                        },
+                        new
+                        {
+                            Id = "SEED_00126",
+                            AltitudeKm = 1411.6515900528298,
+                            Latitude = -70.175924925215512,
+                            Longitude = -128.70127751897149,
+                            Name = "Debris MC-126",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5793266932383769
+                        },
+                        new
+                        {
+                            Id = "SEED_00127",
+                            AltitudeKm = 873.25015485903725,
+                            Latitude = 43.987020158202853,
+                            Longitude = 37.218262822003226,
+                            Name = "Debris MC-127",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.36534403188403
+                        },
+                        new
+                        {
+                            Id = "SEED_00128",
+                            AltitudeKm = 433.72904012619006,
+                            Latitude = -12.577038715862216,
+                            Longitude = 116.52818170214454,
+                            Name = "Debris MC-128",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7095584434967295
+                        },
+                        new
+                        {
+                            Id = "SEED_00129",
+                            AltitudeKm = 1437.695504882231,
+                            Latitude = -53.26057669858475,
+                            Longitude = 65.409738703356027,
+                            Name = "Debris MC-129",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1483243907095515
+                        },
+                        new
+                        {
+                            Id = "SEED_00130",
+                            AltitudeKm = 753.65041347856186,
+                            Latitude = -36.96312234129902,
+                            Longitude = 79.68692070789956,
+                            Name = "Debris MC-130",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8127790609434147
+                        },
+                        new
+                        {
+                            Id = "SEED_00131",
+                            AltitudeKm = 483.48890458396119,
+                            Latitude = -4.1263749329961712,
+                            Longitude = 174.76053837442794,
+                            Name = "Debris MC-131",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9442261005492067
+                        },
+                        new
+                        {
+                            Id = "SEED_00132",
+                            AltitudeKm = 929.82947259667776,
+                            Latitude = -42.730031820354071,
+                            Longitude = -8.9880454488974237,
+                            Name = "Debris MC-132",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4901741133025723
+                        },
+                        new
+                        {
+                            Id = "SEED_00133",
+                            AltitudeKm = 509.77256196074774,
+                            Latitude = 29.042437495217868,
+                            Longitude = -80.892462684257168,
+                            Name = "Debris MC-133",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7265161442228205
+                        },
+                        new
+                        {
+                            Id = "SEED_00134",
+                            AltitudeKm = 507.10763810533456,
+                            Latitude = -82.027366213513247,
+                            Longitude = -135.39817457804372,
+                            Name = "Debris MC-134",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3369124470450506
+                        },
+                        new
+                        {
+                            Id = "SEED_00135",
+                            AltitudeKm = 738.00589127373223,
+                            Latitude = -51.4968348394599,
+                            Longitude = 81.827470689000336,
+                            Name = "Debris MC-135",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3362050600518494
+                        },
+                        new
+                        {
+                            Id = "SEED_00136",
+                            AltitudeKm = 346.0408883383688,
+                            Latitude = -83.655842092659256,
+                            Longitude = -21.121833324954764,
+                            Name = "Debris MC-136",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2919721295088404
+                        },
+                        new
+                        {
+                            Id = "SEED_00137",
+                            AltitudeKm = 985.12333551660345,
+                            Latitude = -82.353493157938814,
+                            Longitude = -124.49815976642918,
+                            Name = "Debris MC-137",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0073054162819428
+                        },
+                        new
+                        {
+                            Id = "SEED_00138",
+                            AltitudeKm = 352.56587809536882,
+                            Latitude = 65.947278326352716,
+                            Longitude = 130.01979380381283,
+                            Name = "Debris MC-138",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8453142248770753
+                        },
+                        new
+                        {
+                            Id = "SEED_00139",
+                            AltitudeKm = 391.91406876403562,
+                            Latitude = 72.519694819357085,
+                            Longitude = 132.35169944928572,
+                            Name = "Debris MC-139",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1870317157297539
+                        },
+                        new
+                        {
+                            Id = "SEED_00140",
+                            AltitudeKm = 448.32823339306202,
+                            Latitude = 88.126025552920083,
+                            Longitude = -73.118787115960743,
+                            Name = "Debris MC-140",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4040086906887632
+                        },
+                        new
+                        {
+                            Id = "SEED_00141",
+                            AltitudeKm = 598.65897553910452,
+                            Latitude = -75.865289478500046,
+                            Longitude = -125.66674073490628,
+                            Name = "Debris MC-141",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2322432718855527
+                        },
+                        new
+                        {
+                            Id = "SEED_00142",
+                            AltitudeKm = 814.49586288747184,
+                            Latitude = 26.798206556960096,
+                            Longitude = 45.754837424380156,
+                            Name = "Debris MC-142",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.120320921586976
+                        },
+                        new
+                        {
+                            Id = "SEED_00143",
+                            AltitudeKm = 1361.9717448307069,
+                            Latitude = 1.6387236358778239,
+                            Longitude = 80.449664173857172,
+                            Name = "Debris MC-143",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8510261859516737
+                        },
+                        new
+                        {
+                            Id = "SEED_00144",
+                            AltitudeKm = 907.92886270579356,
+                            Latitude = -25.857423337110049,
+                            Longitude = -4.5940903688753565,
+                            Name = "Debris MC-144",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0536211810790101
+                        },
+                        new
+                        {
+                            Id = "SEED_00145",
+                            AltitudeKm = 1004.4041681589578,
+                            Latitude = 80.474135936458651,
+                            Longitude = -75.026639706933224,
+                            Name = "Debris MC-145",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.162658733857171
+                        },
+                        new
+                        {
+                            Id = "SEED_00146",
+                            AltitudeKm = 852.49076846637331,
+                            Latitude = 72.737476948060788,
+                            Longitude = 127.19554187133701,
+                            Name = "Debris MC-146",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2002711716109289
+                        },
+                        new
+                        {
+                            Id = "SEED_00147",
+                            AltitudeKm = 997.74828324920884,
+                            Latitude = -48.331113056433907,
+                            Longitude = 40.056354617726214,
+                            Name = "Debris MC-147",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2649732005153655
+                        },
+                        new
+                        {
+                            Id = "SEED_00148",
+                            AltitudeKm = 582.02312061657335,
+                            Latitude = -81.486197603627204,
+                            Longitude = -162.75532034354066,
+                            Name = "Debris MC-148",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3755213226543379
+                        },
+                        new
+                        {
+                            Id = "SEED_00149",
+                            AltitudeKm = 1274.7326445648132,
+                            Latitude = 18.664500335540851,
+                            Longitude = -145.56031838318347,
+                            Name = "Debris MC-149",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3264794022899498
+                        },
+                        new
+                        {
+                            Id = "SEED_00150",
+                            AltitudeKm = 554.922993227338,
+                            Latitude = -55.359762993343068,
+                            Longitude = 138.0738812489779,
+                            Name = "Debris MC-150",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6230757344155924
+                        },
+                        new
+                        {
+                            Id = "SEED_00151",
+                            AltitudeKm = 494.91950878636885,
+                            Latitude = 40.576540683664632,
+                            Longitude = -3.340020525893209,
+                            Name = "Debris MC-151",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2143537186618678
+                        },
+                        new
+                        {
+                            Id = "SEED_00152",
+                            AltitudeKm = 548.63420214906068,
+                            Latitude = 85.714135177300363,
+                            Longitude = -8.4765211997909944,
+                            Name = "Debris MC-152",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6234728333649562
+                        },
+                        new
+                        {
+                            Id = "SEED_00153",
+                            AltitudeKm = 513.13113300741236,
+                            Latitude = -25.013479681226187,
+                            Longitude = -165.29486282975174,
+                            Name = "Debris MC-153",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0469945450532219
+                        },
+                        new
+                        {
+                            Id = "SEED_00154",
+                            AltitudeKm = 738.29043956393866,
+                            Latitude = 37.779981218175948,
+                            Longitude = -174.53962610780243,
+                            Name = "Debris MC-154",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3378078298819291
+                        },
+                        new
+                        {
+                            Id = "SEED_00155",
+                            AltitudeKm = 1408.0020378846684,
+                            Latitude = 34.293014362590853,
+                            Longitude = -18.467388524891504,
+                            Name = "Debris MC-155",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0564169104008085
+                        },
+                        new
+                        {
+                            Id = "SEED_00156",
+                            AltitudeKm = 339.49805462709537,
+                            Latitude = -81.784823775191242,
+                            Longitude = -89.244809257446235,
+                            Name = "Debris MC-156",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6918031983970678
+                        },
+                        new
+                        {
+                            Id = "SEED_00157",
+                            AltitudeKm = 1456.3909465243996,
+                            Latitude = -2.0786360055574278,
+                            Longitude = 168.46640601217115,
+                            Name = "Debris MC-157",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3910227987873478
+                        },
+                        new
+                        {
+                            Id = "SEED_00158",
+                            AltitudeKm = 1311.9620314854951,
+                            Latitude = 31.493058130840325,
+                            Longitude = 44.023602262150291,
+                            Name = "Debris MC-158",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.095309960933081
+                        },
+                        new
+                        {
+                            Id = "SEED_00159",
+                            AltitudeKm = 759.61671586130592,
+                            Latitude = -75.751768837567312,
+                            Longitude = -118.21692581205485,
+                            Name = "Debris MC-159",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6200623934250613
+                        },
+                        new
+                        {
+                            Id = "SEED_00160",
+                            AltitudeKm = 1288.7893694400736,
+                            Latitude = 34.359844617713165,
+                            Longitude = -65.697661938936278,
+                            Name = "Debris MC-160",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1325595628621805
+                        },
+                        new
+                        {
+                            Id = "SEED_00161",
+                            AltitudeKm = 1278.7350916204673,
+                            Latitude = -17.266953013495979,
+                            Longitude = -120.30899503282691,
+                            Name = "Debris MC-161",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0096769484270727
+                        },
+                        new
+                        {
+                            Id = "SEED_00162",
+                            AltitudeKm = 548.5505166689635,
+                            Latitude = 66.65266987711783,
+                            Longitude = 13.328245372198637,
+                            Name = "Debris MC-162",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8827859449120172
+                        },
+                        new
+                        {
+                            Id = "SEED_00163",
+                            AltitudeKm = 532.56342608135355,
+                            Latitude = 41.476274873817459,
+                            Longitude = 31.34591419778107,
+                            Name = "Debris MC-163",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.115616093909189
+                        },
+                        new
+                        {
+                            Id = "SEED_00164",
+                            AltitudeKm = 743.69274603374902,
+                            Latitude = 82.836634941788674,
+                            Longitude = -117.06316052799261,
+                            Name = "Debris MC-164",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7099912109365647
+                        },
+                        new
+                        {
+                            Id = "SEED_00165",
+                            AltitudeKm = 1085.3405482998774,
+                            Latitude = -7.594718457010913,
+                            Longitude = 72.443085020614348,
+                            Name = "Debris MC-165",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0123411014267898
+                        },
+                        new
+                        {
+                            Id = "SEED_00166",
+                            AltitudeKm = 1188.8245458196961,
+                            Latitude = 2.3030974214445337,
+                            Longitude = 160.74478893575485,
+                            Name = "Debris MC-166",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1081226598974894
+                        },
+                        new
+                        {
+                            Id = "SEED_00167",
+                            AltitudeKm = 1042.6074282930267,
+                            Latitude = -54.441736137700147,
+                            Longitude = -138.9350507217157,
+                            Name = "Debris MC-167",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8074037010350281
+                        },
+                        new
+                        {
+                            Id = "SEED_00168",
+                            AltitudeKm = 941.18063312078857,
+                            Latitude = 23.787679566902895,
+                            Longitude = 162.6721574471668,
+                            Name = "Debris MC-168",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5595153777671582
+                        },
+                        new
+                        {
+                            Id = "SEED_00169",
+                            AltitudeKm = 1060.2465484106199,
+                            Latitude = 22.447900321543173,
+                            Longitude = -119.41368372152266,
+                            Name = "Debris MC-169",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.319747281176852
+                        },
+                        new
+                        {
+                            Id = "SEED_00170",
+                            AltitudeKm = 1009.0914262035355,
+                            Latitude = -11.432668371793199,
+                            Longitude = -170.47305123436871,
+                            Name = "Debris MC-170",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4271436775695268
+                        },
+                        new
+                        {
+                            Id = "SEED_00171",
+                            AltitudeKm = 936.30973987109485,
+                            Latitude = 46.950625505741044,
+                            Longitude = -44.951342821564225,
+                            Name = "Debris MC-171",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1318341752662482
+                        },
+                        new
+                        {
+                            Id = "SEED_00172",
+                            AltitudeKm = 424.0037358012068,
+                            Latitude = -12.872712781127873,
+                            Longitude = -144.15925309255684,
+                            Name = "Debris MC-172",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3564984285535751
+                        },
+                        new
+                        {
+                            Id = "SEED_00173",
+                            AltitudeKm = 1446.6813711201221,
+                            Latitude = 54.337625188910209,
+                            Longitude = 147.48712413361631,
+                            Name = "Debris MC-173",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4844858508950498
+                        },
+                        new
+                        {
+                            Id = "SEED_00174",
+                            AltitudeKm = 590.69366748011373,
+                            Latitude = 29.350086785550275,
+                            Longitude = 113.67494648959251,
+                            Name = "Debris MC-174",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6863387709885549
+                        },
+                        new
+                        {
+                            Id = "SEED_00175",
+                            AltitudeKm = 1270.6864663263254,
+                            Latitude = -13.478179389367895,
+                            Longitude = -152.32891088925717,
+                            Name = "Debris MC-175",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1343349603164636
+                        },
+                        new
+                        {
+                            Id = "SEED_00176",
+                            AltitudeKm = 1447.6442254835945,
+                            Latitude = 75.273008442145311,
+                            Longitude = 60.788266752282283,
+                            Name = "Debris MC-176",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1678349679186173
+                        },
+                        new
+                        {
+                            Id = "SEED_00177",
+                            AltitudeKm = 442.84020631706352,
+                            Latitude = -80.504137869227748,
+                            Longitude = 115.48533716028805,
+                            Name = "Debris MC-177",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1878623066879168
+                        },
+                        new
+                        {
+                            Id = "SEED_00178",
+                            AltitudeKm = 344.2107578945396,
+                            Latitude = 7.4314374744107141,
+                            Longitude = -3.6315236723197302,
+                            Name = "Debris MC-178",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6470150596681119
+                        },
+                        new
+                        {
+                            Id = "SEED_00179",
+                            AltitudeKm = 596.86871110315838,
+                            Latitude = -70.14217142022315,
+                            Longitude = 73.087681873276665,
+                            Name = "Debris MC-179",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2064897402685553
+                        },
+                        new
+                        {
+                            Id = "SEED_00180",
+                            AltitudeKm = 672.31621312551022,
+                            Latitude = -15.074066512786814,
+                            Longitude = 55.007161682009325,
+                            Name = "Debris MC-180",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1469824200714855
+                        },
+                        new
+                        {
+                            Id = "SEED_00181",
+                            AltitudeKm = 1183.6721262352876,
+                            Latitude = -88.068085731038863,
+                            Longitude = 77.222605635050058,
+                            Name = "Debris MC-181",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0837009791674568
+                        },
+                        new
+                        {
+                            Id = "SEED_00182",
+                            AltitudeKm = 1151.945056976725,
+                            Latitude = 89.333873055565107,
+                            Longitude = 16.077585721424583,
+                            Name = "Debris MC-182",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2134202256395579
+                        },
+                        new
+                        {
+                            Id = "SEED_00183",
+                            AltitudeKm = 845.65235420393401,
+                            Latitude = 76.689108017221628,
+                            Longitude = -116.64734051406725,
+                            Name = "Debris MC-183",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5394315589402954
+                        },
+                        new
+                        {
+                            Id = "SEED_00184",
+                            AltitudeKm = 339.89488577465289,
+                            Latitude = -50.839495566133174,
+                            Longitude = 120.48703738510937,
+                            Name = "Debris MC-184",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1379707677466655
+                        },
+                        new
+                        {
+                            Id = "SEED_00185",
+                            AltitudeKm = 342.1615926745169,
+                            Latitude = -14.622305233321299,
+                            Longitude = 90.612529660860332,
+                            Name = "Debris MC-185",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9115384886560678
+                        },
+                        new
+                        {
+                            Id = "SEED_00186",
+                            AltitudeKm = 735.65582634678844,
+                            Latitude = 86.494342506162042,
+                            Longitude = -67.885832864738006,
+                            Name = "Debris MC-186",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4679448918755842
+                        },
+                        new
+                        {
+                            Id = "SEED_00187",
+                            AltitudeKm = 1355.203156850861,
+                            Latitude = 67.11194838262719,
+                            Longitude = 8.7207970156896977,
+                            Name = "Debris MC-187",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4400520487409327
+                        },
+                        new
+                        {
+                            Id = "SEED_00188",
+                            AltitudeKm = 349.56479354275615,
+                            Latitude = 12.307166579322512,
+                            Longitude = -142.34943742041915,
+                            Name = "Debris MC-188",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1584853314135621
+                        },
+                        new
+                        {
+                            Id = "SEED_00189",
+                            AltitudeKm = 1194.5885397934303,
+                            Latitude = 47.988112586544872,
+                            Longitude = 75.930159080741049,
+                            Name = "Debris MC-189",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3055142135385021
+                        },
+                        new
+                        {
+                            Id = "SEED_00190",
+                            AltitudeKm = 1238.7088206311264,
+                            Latitude = 77.84331444084799,
+                            Longitude = -95.794967355111126,
+                            Name = "Debris MC-190",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7621422439171663
+                        },
+                        new
+                        {
+                            Id = "SEED_00191",
+                            AltitudeKm = 1339.0291252355228,
+                            Latitude = -70.049089966364704,
+                            Longitude = -68.368792258374754,
+                            Name = "Debris MC-191",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5479592310953691
+                        },
+                        new
+                        {
+                            Id = "SEED_00192",
+                            AltitudeKm = 556.54201817537751,
+                            Latitude = -83.663614966749961,
+                            Longitude = 63.79965322269112,
+                            Name = "Debris MC-192",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4134525823935178
+                        },
+                        new
+                        {
+                            Id = "SEED_00193",
+                            AltitudeKm = 1162.6738271036529,
+                            Latitude = 30.559608070440405,
+                            Longitude = -124.05237092825229,
+                            Name = "Debris MC-193",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9968305721398583
+                        },
+                        new
+                        {
+                            Id = "SEED_00194",
+                            AltitudeKm = 440.9569860161082,
+                            Latitude = 21.179341939827111,
+                            Longitude = 72.925626660196855,
+                            Name = "Debris MC-194",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0489569225110849
+                        },
+                        new
+                        {
+                            Id = "SEED_00195",
+                            AltitudeKm = 1319.5477941164504,
+                            Latitude = -26.737071134493256,
+                            Longitude = -27.205136179553875,
+                            Name = "Debris MC-195",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7081122878976691
+                        },
+                        new
+                        {
+                            Id = "SEED_00196",
+                            AltitudeKm = 588.68840331616275,
+                            Latitude = 29.758319333083136,
+                            Longitude = 89.971025395193578,
+                            Name = "Debris MC-196",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2321985560619275
+                        },
+                        new
+                        {
+                            Id = "SEED_00197",
+                            AltitudeKm = 1011.6244965752701,
+                            Latitude = -65.758389288447049,
+                            Longitude = 65.659226721925279,
+                            Name = "Debris MC-197",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7599618741124692
+                        },
+                        new
+                        {
+                            Id = "SEED_00198",
+                            AltitudeKm = 491.42118459167943,
+                            Latitude = -73.944762276459841,
+                            Longitude = 118.64505448315526,
+                            Name = "Debris MC-198",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2772931537019518
+                        },
+                        new
+                        {
+                            Id = "SEED_00199",
+                            AltitudeKm = 896.22472403395216,
+                            Latitude = 84.499941735761212,
+                            Longitude = 9.7343392622351246,
+                            Name = "Debris MC-199",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0056561552945791
+                        },
+                        new
+                        {
+                            Id = "SEED_00200",
+                            AltitudeKm = 632.11334661213368,
+                            Latitude = -9.7972852176974072,
+                            Longitude = 179.18653244114785,
+                            Name = "Debris MC-200",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2934343480940136
+                        },
+                        new
+                        {
+                            Id = "SEED_00201",
+                            AltitudeKm = 648.31091852314353,
+                            Latitude = -34.120904218461781,
+                            Longitude = 37.332327280813985,
+                            Name = "Debris MC-201",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6194446003620717
+                        },
+                        new
+                        {
+                            Id = "SEED_00202",
+                            AltitudeKm = 485.59265219866887,
+                            Latitude = -20.575792775757506,
+                            Longitude = -44.369899250739223,
+                            Name = "Debris MC-202",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0960441604703872
+                        },
+                        new
+                        {
+                            Id = "SEED_00203",
+                            AltitudeKm = 1322.6585117274237,
+                            Latitude = 16.821531637954308,
+                            Longitude = -163.37309946463122,
+                            Name = "Debris MC-203",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7620490210885409
+                        },
+                        new
+                        {
+                            Id = "SEED_00204",
+                            AltitudeKm = 1311.3249995798456,
+                            Latitude = -20.829652795023122,
+                            Longitude = -68.33430290610265,
+                            Name = "Debris MC-204",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5413783111336539
+                        },
+                        new
+                        {
+                            Id = "SEED_00205",
+                            AltitudeKm = 576.75664679927593,
+                            Latitude = -77.487656626611795,
+                            Longitude = -164.01891588420557,
+                            Name = "Debris MC-205",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5292230972690612
+                        },
+                        new
+                        {
+                            Id = "SEED_00206",
+                            AltitudeKm = 523.72714775787995,
+                            Latitude = -74.843847874944956,
+                            Longitude = 74.571755665620685,
+                            Name = "Debris MC-206",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2603090069071889
+                        },
+                        new
+                        {
+                            Id = "SEED_00207",
+                            AltitudeKm = 1134.1315128068122,
+                            Latitude = 89.260636847121958,
+                            Longitude = 12.251791242627348,
+                            Name = "Debris MC-207",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1359347692392463
+                        },
+                        new
+                        {
+                            Id = "SEED_00208",
+                            AltitudeKm = 604.48077279351696,
+                            Latitude = -52.970895274994376,
+                            Longitude = -19.070381465866404,
+                            Name = "Debris MC-208",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5305805220411068
+                        },
+                        new
+                        {
+                            Id = "SEED_00209",
+                            AltitudeKm = 493.96252510788037,
+                            Latitude = -63.419570081596987,
+                            Longitude = 55.440094692371844,
+                            Name = "Debris MC-209",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.092434630772301
+                        },
+                        new
+                        {
+                            Id = "SEED_00210",
+                            AltitudeKm = 822.93079668792461,
+                            Latitude = -7.2611250808747201,
+                            Longitude = 117.93981690795152,
+                            Name = "Debris MC-210",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1368880028076873
+                        },
+                        new
+                        {
+                            Id = "SEED_00211",
+                            AltitudeKm = 1395.8259550369464,
+                            Latitude = 4.9907155311623228,
+                            Longitude = 10.436750459688142,
+                            Name = "Debris MC-211",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0645148954654644
+                        },
+                        new
+                        {
+                            Id = "SEED_00212",
+                            AltitudeKm = 1260.6988749283828,
+                            Latitude = 85.923750482464072,
+                            Longitude = 54.534590316253997,
+                            Name = "Debris MC-212",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9888924432401041
+                        },
+                        new
+                        {
+                            Id = "SEED_00213",
+                            AltitudeKm = 1021.1093017464082,
+                            Latitude = 33.168419694140738,
+                            Longitude = -131.06337746189132,
+                            Name = "Debris MC-213",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6017681060367117
+                        },
+                        new
+                        {
+                            Id = "SEED_00214",
+                            AltitudeKm = 433.70646430817737,
+                            Latitude = 48.079769200682534,
+                            Longitude = 152.62046063906536,
+                            Name = "Debris MC-214",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9049434829060656
+                        },
+                        new
+                        {
+                            Id = "SEED_00215",
+                            AltitudeKm = 800.48476797551143,
+                            Latitude = -14.892908523275011,
+                            Longitude = -17.980886100782499,
+                            Name = "Debris MC-215",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2774859300244064
+                        },
+                        new
+                        {
+                            Id = "SEED_00216",
+                            AltitudeKm = 1329.9746302096055,
+                            Latitude = 32.69532345360858,
+                            Longitude = -156.94654895781844,
+                            Name = "Debris MC-216",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.219639353090729
+                        },
+                        new
+                        {
+                            Id = "SEED_00217",
+                            AltitudeKm = 732.43635074814608,
+                            Latitude = 52.641334348656869,
+                            Longitude = -0.54177177163853685,
+                            Name = "Debris MC-217",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0954191654899255
+                        },
+                        new
+                        {
+                            Id = "SEED_00218",
+                            AltitudeKm = 1381.510149446088,
+                            Latitude = -63.261530219233379,
+                            Longitude = 101.2131884886013,
+                            Name = "Debris MC-218",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3628536243284373
+                        },
+                        new
+                        {
+                            Id = "SEED_00219",
+                            AltitudeKm = 1290.1070409408339,
+                            Latitude = 19.550922554708521,
+                            Longitude = -9.8261266340623195,
+                            Name = "Debris MC-219",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8328148074600916
+                        },
+                        new
+                        {
+                            Id = "SEED_00220",
+                            AltitudeKm = 1335.4222023093246,
+                            Latitude = 52.911984577268356,
+                            Longitude = -128.36543058434754,
+                            Name = "Debris MC-220",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5166111807416245
+                        },
+                        new
+                        {
+                            Id = "SEED_00221",
+                            AltitudeKm = 787.62501743045868,
+                            Latitude = 42.021064382056267,
+                            Longitude = -167.09473253558144,
+                            Name = "Debris MC-221",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1046732787995941
+                        },
+                        new
+                        {
+                            Id = "SEED_00222",
+                            AltitudeKm = 1003.9326229616686,
+                            Latitude = 62.29841400510557,
+                            Longitude = 126.91988638924431,
+                            Name = "Debris MC-222",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3355849966572526
+                        },
+                        new
+                        {
+                            Id = "SEED_00223",
+                            AltitudeKm = 1073.2337614396745,
+                            Latitude = 7.6640776999593214,
+                            Longitude = 21.002321634908355,
+                            Name = "Debris MC-223",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0144109830793049
+                        },
+                        new
+                        {
+                            Id = "SEED_00224",
+                            AltitudeKm = 391.54157922209311,
+                            Latitude = -16.10280674235095,
+                            Longitude = 30.28261580051975,
+                            Name = "Debris MC-224",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6955332500839297
+                        },
+                        new
+                        {
+                            Id = "SEED_00225",
+                            AltitudeKm = 600.66968738132607,
+                            Latitude = 30.72218069840325,
+                            Longitude = 96.034341769308924,
+                            Name = "Debris MC-225",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7182886364023613
+                        },
+                        new
+                        {
+                            Id = "SEED_00226",
+                            AltitudeKm = 912.8574893869727,
+                            Latitude = -37.598157454094924,
+                            Longitude = -154.69093723906713,
+                            Name = "Debris MC-226",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3546818787486679
+                        },
+                        new
+                        {
+                            Id = "SEED_00227",
+                            AltitudeKm = 1251.0750011313125,
+                            Latitude = -47.758211147858859,
+                            Longitude = -50.75207931490246,
+                            Name = "Debris MC-227",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4416069376476139
+                        },
+                        new
+                        {
+                            Id = "SEED_00228",
+                            AltitudeKm = 1271.2082224763967,
+                            Latitude = -72.205825821592384,
+                            Longitude = 20.236385502031254,
+                            Name = "Debris MC-228",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4107483897408226
+                        },
+                        new
+                        {
+                            Id = "SEED_00229",
+                            AltitudeKm = 441.84831480581704,
+                            Latitude = 15.696226603210093,
+                            Longitude = -153.84125298533647,
+                            Name = "Debris MC-229",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9686890810116608
+                        },
+                        new
+                        {
+                            Id = "SEED_00230",
+                            AltitudeKm = 660.38872243854621,
+                            Latitude = 28.382972906521971,
+                            Longitude = 103.8708021509791,
+                            Name = "Debris MC-230",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4098449262836219
+                        },
+                        new
+                        {
+                            Id = "SEED_00231",
+                            AltitudeKm = 525.24148105887764,
+                            Latitude = 74.139220669930438,
+                            Longitude = -130.80949397329684,
+                            Name = "Debris MC-231",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8853109080276038
+                        },
+                        new
+                        {
+                            Id = "SEED_00232",
+                            AltitudeKm = 1297.6349444117559,
+                            Latitude = -65.378469971650503,
+                            Longitude = 140.99440889479331,
+                            Name = "Debris MC-232",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.036746788787072
+                        },
+                        new
+                        {
+                            Id = "SEED_00233",
+                            AltitudeKm = 1361.4373079787181,
+                            Latitude = -18.644300200345128,
+                            Longitude = -49.895867737892956,
+                            Name = "Debris MC-233",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0407901141051159
+                        },
+                        new
+                        {
+                            Id = "SEED_00234",
+                            AltitudeKm = 363.94332762059912,
+                            Latitude = 70.71683160062733,
+                            Longitude = -41.762612043769366,
+                            Name = "Debris MC-234",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9947211083465817
+                        },
+                        new
+                        {
+                            Id = "SEED_00235",
+                            AltitudeKm = 1302.1266973587344,
+                            Latitude = 4.5240103241633705,
+                            Longitude = 1.1638543294574504,
+                            Name = "Debris MC-235",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7306204471879738
+                        },
+                        new
+                        {
+                            Id = "SEED_00236",
+                            AltitudeKm = 449.84016946975146,
+                            Latitude = -79.201306975074715,
+                            Longitude = -74.805878146926815,
+                            Name = "Debris MC-236",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4795490412411976
+                        },
+                        new
+                        {
+                            Id = "SEED_00237",
+                            AltitudeKm = 806.88727577537634,
+                            Latitude = 44.819927445994665,
+                            Longitude = -46.609485105895203,
+                            Name = "Debris MC-237",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5068151645859773
+                        },
+                        new
+                        {
+                            Id = "SEED_00238",
+                            AltitudeKm = 1267.2067806903306,
+                            Latitude = -6.1359393206126782,
+                            Longitude = -25.022905676170666,
+                            Name = "Debris MC-238",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3232231635242808
+                        },
+                        new
+                        {
+                            Id = "SEED_00239",
+                            AltitudeKm = 980.36943798901962,
+                            Latitude = -6.0411374811274641,
+                            Longitude = -68.161876093671609,
+                            Name = "Debris MC-239",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2317215794379459
+                        },
+                        new
+                        {
+                            Id = "SEED_00240",
+                            AltitudeKm = 1219.6019694766039,
+                            Latitude = 68.868309221634775,
+                            Longitude = 151.3826288894669,
+                            Name = "Debris MC-240",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5145382033728705
+                        },
+                        new
+                        {
+                            Id = "SEED_00241",
+                            AltitudeKm = 1377.5808847870589,
+                            Latitude = 4.9787186807853772,
+                            Longitude = 96.503271030496478,
+                            Name = "Debris MC-241",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1061842337279515
+                        },
+                        new
+                        {
+                            Id = "SEED_00242",
+                            AltitudeKm = 757.15316778847625,
+                            Latitude = 30.902596554207904,
+                            Longitude = 101.57283935769124,
+                            Name = "Debris MC-242",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.30481277187579
+                        },
+                        new
+                        {
+                            Id = "SEED_00243",
+                            AltitudeKm = 444.79119598157297,
+                            Latitude = -86.512125635758096,
+                            Longitude = -16.17857156143458,
+                            Name = "Debris MC-243",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2316753811816108
+                        },
+                        new
+                        {
+                            Id = "SEED_00244",
+                            AltitudeKm = 1355.8846541940629,
+                            Latitude = 81.616396471679394,
+                            Longitude = 112.76770940645025,
+                            Name = "Debris MC-244",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9295179978616153
+                        },
+                        new
+                        {
+                            Id = "SEED_00245",
+                            AltitudeKm = 1309.4492101154519,
+                            Latitude = -87.880772407111138,
+                            Longitude = -107.51932558022408,
+                            Name = "Debris MC-245",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1493856048441415
+                        },
+                        new
+                        {
+                            Id = "SEED_00246",
+                            AltitudeKm = 970.30369316707538,
+                            Latitude = -5.5358869189097959,
+                            Longitude = -2.345156177107782,
+                            Name = "Debris MC-246",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.448892938647834
+                        },
+                        new
+                        {
+                            Id = "SEED_00247",
+                            AltitudeKm = 972.90634115827561,
+                            Latitude = 9.9710490275039518,
+                            Longitude = -179.14236685221195,
+                            Name = "Debris MC-247",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8733147470621923
+                        },
+                        new
+                        {
+                            Id = "SEED_00248",
+                            AltitudeKm = 1236.6548251997003,
+                            Latitude = 57.063278279762386,
+                            Longitude = 143.56981922107275,
+                            Name = "Debris MC-248",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9069391323285823
+                        },
+                        new
+                        {
+                            Id = "SEED_00249",
+                            AltitudeKm = 1451.3048998784761,
+                            Latitude = 42.641631743238122,
+                            Longitude = -2.8511596018686873,
+                            Name = "Debris MC-249",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4378921459139757
+                        },
+                        new
+                        {
+                            Id = "SEED_00250",
+                            AltitudeKm = 677.62192263157203,
+                            Latitude = -19.040071791522237,
+                            Longitude = -40.532165253782722,
+                            Name = "Debris MC-250",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4502792313929085
+                        },
+                        new
+                        {
+                            Id = "SEED_00251",
+                            AltitudeKm = 682.1996359071693,
+                            Latitude = 88.122282278780943,
+                            Longitude = -101.08888251757662,
+                            Name = "Debris MC-251",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0162778871675382
+                        },
+                        new
+                        {
+                            Id = "SEED_00252",
+                            AltitudeKm = 1414.4692210082287,
+                            Latitude = -34.230132235321278,
+                            Longitude = 54.55994272351262,
+                            Name = "Debris MC-252",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9797917317970617
+                        },
+                        new
+                        {
+                            Id = "SEED_00253",
+                            AltitudeKm = 471.24907959776419,
+                            Latitude = -12.46363617594524,
+                            Longitude = 161.02651190991816,
+                            Name = "Debris MC-253",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0218997667645571
+                        },
+                        new
+                        {
+                            Id = "SEED_00254",
+                            AltitudeKm = 1348.5364754910286,
+                            Latitude = -75.726067072584328,
+                            Longitude = -179.97195431961302,
+                            Name = "Debris MC-254",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0512608064111602
+                        },
+                        new
+                        {
+                            Id = "SEED_00255",
+                            AltitudeKm = 518.47372679900081,
+                            Latitude = -52.293918459813071,
+                            Longitude = 155.53996016063724,
+                            Name = "Debris MC-255",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0039481665026155
+                        },
+                        new
+                        {
+                            Id = "SEED_00256",
+                            AltitudeKm = 763.42836230221587,
+                            Latitude = -50.149531494895712,
+                            Longitude = 107.55041104161666,
+                            Name = "Debris MC-256",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.180858039614213
+                        },
+                        new
+                        {
+                            Id = "SEED_00257",
+                            AltitudeKm = 801.06275999036757,
+                            Latitude = 31.412490439327655,
+                            Longitude = 5.7719670356120787,
+                            Name = "Debris MC-257",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6920164689384478
+                        },
+                        new
+                        {
+                            Id = "SEED_00258",
+                            AltitudeKm = 570.54821023277395,
+                            Latitude = 63.688119721453688,
+                            Longitude = 31.671281238864765,
+                            Name = "Debris MC-258",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9365442518315019
+                        },
+                        new
+                        {
+                            Id = "SEED_00259",
+                            AltitudeKm = 1232.0266020167742,
+                            Latitude = 69.597048815152164,
+                            Longitude = 134.76774750033752,
+                            Name = "Debris MC-259",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.375071286165654
+                        },
+                        new
+                        {
+                            Id = "SEED_00260",
+                            AltitudeKm = 1087.3152324870766,
+                            Latitude = -58.502523474629278,
+                            Longitude = 17.184415029913396,
+                            Name = "Debris MC-260",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3557589805478969
+                        },
+                        new
+                        {
+                            Id = "SEED_00261",
+                            AltitudeKm = 481.74270548938898,
+                            Latitude = -76.741566577340279,
+                            Longitude = 146.7218867161879,
+                            Name = "Debris MC-261",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3045835193733613
+                        },
+                        new
+                        {
+                            Id = "SEED_00262",
+                            AltitudeKm = 930.39175301342823,
+                            Latitude = 46.097547670871734,
+                            Longitude = -144.25949646358356,
+                            Name = "Debris MC-262",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.105230074192038
+                        },
+                        new
+                        {
+                            Id = "SEED_00263",
+                            AltitudeKm = 398.93983979660078,
+                            Latitude = 21.293948875411388,
+                            Longitude = 153.08887642486434,
+                            Name = "Debris MC-263",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6932495677346591
+                        },
+                        new
+                        {
+                            Id = "SEED_00264",
+                            AltitudeKm = 1194.5535950802982,
+                            Latitude = -53.037141646741489,
+                            Longitude = 52.339016828843882,
+                            Name = "Debris MC-264",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2862256396497722
+                        },
+                        new
+                        {
+                            Id = "SEED_00265",
+                            AltitudeKm = 703.60570680517969,
+                            Latitude = 59.941304395879314,
+                            Longitude = -108.74603873526027,
+                            Name = "Debris MC-265",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1906990353906064
+                        },
+                        new
+                        {
+                            Id = "SEED_00266",
+                            AltitudeKm = 1259.2459206279582,
+                            Latitude = -47.879442636798814,
+                            Longitude = -11.743186242758838,
+                            Name = "Debris MC-266",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2641726933718527
+                        },
+                        new
+                        {
+                            Id = "SEED_00267",
+                            AltitudeKm = 1253.5394879772978,
+                            Latitude = 39.931024420043002,
+                            Longitude = 6.6041034397688065,
+                            Name = "Debris MC-267",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3074171598103907
+                        },
+                        new
+                        {
+                            Id = "SEED_00268",
+                            AltitudeKm = 1331.0254682931236,
+                            Latitude = -49.789967462322657,
+                            Longitude = 44.543833967551507,
+                            Name = "Debris MC-268",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9926156168769182
+                        },
+                        new
+                        {
+                            Id = "SEED_00269",
+                            AltitudeKm = 1014.7689770510276,
+                            Latitude = -40.327304792742858,
+                            Longitude = -79.840037291795042,
+                            Name = "Debris MC-269",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4707460428917525
+                        },
+                        new
+                        {
+                            Id = "SEED_00270",
+                            AltitudeKm = 737.36944721889188,
+                            Latitude = 26.513799697399975,
+                            Longitude = 5.9284640410581915,
+                            Name = "Debris MC-270",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8628519889259954
+                        },
+                        new
+                        {
+                            Id = "SEED_00271",
+                            AltitudeKm = 1311.6535159813488,
+                            Latitude = 88.327220565791805,
+                            Longitude = 65.063610191020928,
+                            Name = "Debris MC-271",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3928640125751794
+                        },
+                        new
+                        {
+                            Id = "SEED_00272",
+                            AltitudeKm = 802.81634577681143,
+                            Latitude = 0.99466464994226556,
+                            Longitude = 94.784566813513891,
+                            Name = "Debris MC-272",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3618961700060854
+                        },
+                        new
+                        {
+                            Id = "SEED_00273",
+                            AltitudeKm = 800.44833295999479,
+                            Latitude = -66.799165511875955,
+                            Longitude = 30.913827089087022,
+                            Name = "Debris MC-273",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4655874657750072
+                        },
+                        new
+                        {
+                            Id = "SEED_00274",
+                            AltitudeKm = 1103.8034686836431,
+                            Latitude = -51.948648505820266,
+                            Longitude = 130.42680125237757,
+                            Name = "Debris MC-274",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9094168878669926
+                        },
+                        new
+                        {
+                            Id = "SEED_00275",
+                            AltitudeKm = 477.4599860317353,
+                            Latitude = -70.525944736099774,
+                            Longitude = -68.878634762428078,
+                            Name = "Debris MC-275",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3566291329248941
+                        },
+                        new
+                        {
+                            Id = "SEED_00276",
+                            AltitudeKm = 916.11717576911542,
+                            Latitude = -35.160671428386436,
+                            Longitude = -64.662592450465354,
+                            Name = "Debris MC-276",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.491850265763631
+                        },
+                        new
+                        {
+                            Id = "SEED_00277",
+                            AltitudeKm = 523.44835280601319,
+                            Latitude = -78.10938203153637,
+                            Longitude = -28.545796111480229,
+                            Name = "Debris MC-277",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.3906906416596332
+                        },
+                        new
+                        {
+                            Id = "SEED_00278",
+                            AltitudeKm = 952.22184707048439,
+                            Latitude = -81.045838143232203,
+                            Longitude = -24.612971769931249,
+                            Name = "Debris MC-278",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.474808936461252
+                        },
+                        new
+                        {
+                            Id = "SEED_00279",
+                            AltitudeKm = 1263.7110912072058,
+                            Latitude = 60.021563549536069,
+                            Longitude = 93.997234699315015,
+                            Name = "Debris MC-279",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8299062688974228
+                        },
+                        new
+                        {
+                            Id = "SEED_00280",
+                            AltitudeKm = 704.70705703120075,
+                            Latitude = 22.380379481418245,
+                            Longitude = 133.48641317034435,
+                            Name = "Debris MC-280",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4378228417773844
+                        },
+                        new
+                        {
+                            Id = "SEED_00281",
+                            AltitudeKm = 391.26149792748572,
+                            Latitude = -72.120400146637294,
+                            Longitude = 19.206765591728868,
+                            Name = "Debris MC-281",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9562759916094485
+                        },
+                        new
+                        {
+                            Id = "SEED_00282",
+                            AltitudeKm = 840.41681687366997,
+                            Latitude = -52.795332960223469,
+                            Longitude = 137.56664870193538,
+                            Name = "Debris MC-282",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6204941215089033
+                        },
+                        new
+                        {
+                            Id = "SEED_00283",
+                            AltitudeKm = 546.76979922073417,
+                            Latitude = 19.509461051556016,
+                            Longitude = 176.17064002722998,
+                            Name = "Debris MC-283",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5079426423217832
+                        },
+                        new
+                        {
+                            Id = "SEED_00284",
+                            AltitudeKm = 624.68606733003912,
+                            Latitude = -23.654765884231196,
+                            Longitude = -134.38015773630707,
+                            Name = "Debris MC-284",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0054876399252031
+                        },
+                        new
+                        {
+                            Id = "SEED_00285",
+                            AltitudeKm = 1335.0204236037193,
+                            Latitude = -59.885771269856846,
+                            Longitude = 125.45199101113343,
+                            Name = "Debris MC-285",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1272296892140199
+                        },
+                        new
+                        {
+                            Id = "SEED_00286",
+                            AltitudeKm = 529.82252362641623,
+                            Latitude = 13.875030485854978,
+                            Longitude = -2.9208502652686263,
+                            Name = "Debris MC-286",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.045894336442414
+                        },
+                        new
+                        {
+                            Id = "SEED_00287",
+                            AltitudeKm = 472.32621562309851,
+                            Latitude = -82.376363516029144,
+                            Longitude = -143.81964486270195,
+                            Name = "Debris MC-287",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.675439451204352
+                        },
+                        new
+                        {
+                            Id = "SEED_00288",
+                            AltitudeKm = 1478.3309804174728,
+                            Latitude = -79.343263054892077,
+                            Longitude = -138.03646393028856,
+                            Name = "Debris MC-288",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.356090405656067
+                        },
+                        new
+                        {
+                            Id = "SEED_00289",
+                            AltitudeKm = 466.10597398416417,
+                            Latitude = 84.854624064105849,
+                            Longitude = -111.8394862170515,
+                            Name = "Debris MC-289",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1269662147979105
+                        },
+                        new
+                        {
+                            Id = "SEED_00290",
+                            AltitudeKm = 1245.4490990123941,
+                            Latitude = -46.020520914355536,
+                            Longitude = 135.32891474446694,
+                            Name = "Debris MC-290",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2758941134791328
+                        },
+                        new
+                        {
+                            Id = "SEED_00291",
+                            AltitudeKm = 682.48943965066667,
+                            Latitude = 84.664579413209395,
+                            Longitude = 98.115916679667237,
+                            Name = "Debris MC-291",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0905736820262737
+                        },
+                        new
+                        {
+                            Id = "SEED_00292",
+                            AltitudeKm = 1437.5455883972093,
+                            Latitude = -49.321955768075746,
+                            Longitude = -106.23968003608272,
+                            Name = "Debris MC-292",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0600970201474134
+                        },
+                        new
+                        {
+                            Id = "SEED_00293",
+                            AltitudeKm = 763.16349025031718,
+                            Latitude = -1.7042927498483493,
+                            Longitude = -132.20370621988724,
+                            Name = "Debris MC-293",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1637865331320967
+                        },
+                        new
+                        {
+                            Id = "SEED_00294",
+                            AltitudeKm = 757.75807018287389,
+                            Latitude = -88.5098569553857,
+                            Longitude = -89.12300830200455,
+                            Name = "Debris MC-294",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9111668748833086
+                        },
+                        new
+                        {
+                            Id = "SEED_00295",
+                            AltitudeKm = 1014.1965500610864,
+                            Latitude = -24.869995748098006,
+                            Longitude = -43.636191367933606,
+                            Name = "Debris MC-295",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1592874122593955
+                        },
+                        new
+                        {
+                            Id = "SEED_00296",
+                            AltitudeKm = 725.35038423973629,
+                            Latitude = 42.934392007502908,
+                            Longitude = -179.98042322694343,
+                            Name = "Debris MC-296",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7377307751391697
+                        },
+                        new
+                        {
+                            Id = "SEED_00297",
+                            AltitudeKm = 740.6566200967211,
+                            Latitude = -88.664327049005934,
+                            Longitude = 168.56924240876418,
+                            Name = "Debris MC-297",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2688748102024547
+                        },
+                        new
+                        {
+                            Id = "SEED_00298",
+                            AltitudeKm = 811.19358470253349,
+                            Latitude = 87.894025034221841,
+                            Longitude = 6.9339286475134543,
+                            Name = "Debris MC-298",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.437081427982581
+                        },
+                        new
+                        {
+                            Id = "SEED_00299",
+                            AltitudeKm = 437.35322194982007,
+                            Latitude = -79.091369346292396,
+                            Longitude = 64.291539846123925,
+                            Name = "Debris MC-299",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2068089345501782
+                        },
+                        new
+                        {
+                            Id = "SEED_00300",
+                            AltitudeKm = 865.52850760776948,
+                            Latitude = -58.833841080234308,
+                            Longitude = -132.79092659838076,
+                            Name = "Debris MC-300",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2561956375167682
+                        },
+                        new
+                        {
+                            Id = "SEED_00301",
+                            AltitudeKm = 1451.7135126291371,
+                            Latitude = -62.541660690932375,
+                            Longitude = -22.7254201484497,
+                            Name = "Debris MC-301",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.38965491712543
+                        },
+                        new
+                        {
+                            Id = "SEED_00302",
+                            AltitudeKm = 574.93803756075818,
+                            Latitude = 41.507244497308164,
+                            Longitude = -105.80947382646123,
+                            Name = "Debris MC-302",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0784677351259013
+                        },
+                        new
+                        {
+                            Id = "SEED_00303",
+                            AltitudeKm = 767.37294349231433,
+                            Latitude = 55.416546364043171,
+                            Longitude = 11.151742223255212,
+                            Name = "Debris MC-303",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2983131230800939
+                        },
+                        new
+                        {
+                            Id = "SEED_00304",
+                            AltitudeKm = 834.48601073328689,
+                            Latitude = -39.465025136929476,
+                            Longitude = 65.405750761463196,
+                            Name = "Debris MC-304",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4554565918890088
+                        },
+                        new
+                        {
+                            Id = "SEED_00305",
+                            AltitudeKm = 363.55445928105826,
+                            Latitude = -14.744599296126793,
+                            Longitude = 117.69144586179942,
+                            Name = "Debris MC-305",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3866118585628513
+                        },
+                        new
+                        {
+                            Id = "SEED_00306",
+                            AltitudeKm = 1162.1174492231185,
+                            Latitude = 60.781666967450462,
+                            Longitude = 96.73372207057372,
+                            Name = "Debris MC-306",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4569061910532906
+                        },
+                        new
+                        {
+                            Id = "SEED_00307",
+                            AltitudeKm = 1158.305022147626,
+                            Latitude = 37.21910918467637,
+                            Longitude = -145.9504956407242,
+                            Name = "Debris MC-307",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4945364426796033
+                        },
+                        new
+                        {
+                            Id = "SEED_00308",
+                            AltitudeKm = 821.1591071082089,
+                            Latitude = -65.164487443475281,
+                            Longitude = 27.693276762819522,
+                            Name = "Debris MC-308",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3460455629257702
+                        },
+                        new
+                        {
+                            Id = "SEED_00309",
+                            AltitudeKm = 1444.3743344137326,
+                            Latitude = 73.35262817486776,
+                            Longitude = 92.772012014301481,
+                            Name = "Debris MC-309",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.4524758506810649
+                        },
+                        new
+                        {
+                            Id = "SEED_00310",
+                            AltitudeKm = 1213.4696567959477,
+                            Latitude = -82.747238507842297,
+                            Longitude = -25.912064838182204,
+                            Name = "Debris MC-310",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2020034155352057
+                        },
+                        new
+                        {
+                            Id = "SEED_00311",
+                            AltitudeKm = 745.65620573500928,
+                            Latitude = 43.043915570268382,
+                            Longitude = 53.364729598800068,
+                            Name = "Debris MC-311",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.685984616021619
+                        },
+                        new
+                        {
+                            Id = "SEED_00312",
+                            AltitudeKm = 312.76530996559433,
+                            Latitude = -66.638977200090409,
+                            Longitude = 21.762925871537476,
+                            Name = "Debris MC-312",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5683812939414672
+                        },
+                        new
+                        {
+                            Id = "SEED_00313",
+                            AltitudeKm = 763.74447628098756,
+                            Latitude = -48.027131686931071,
+                            Longitude = -128.10361546841619,
+                            Name = "Debris MC-313",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5193369665738832
+                        },
+                        new
+                        {
+                            Id = "SEED_00314",
+                            AltitudeKm = 1499.7453968970783,
+                            Latitude = -75.928632191349109,
+                            Longitude = -103.12829377275347,
+                            Name = "Debris MC-314",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5757623189481729
+                        },
+                        new
+                        {
+                            Id = "SEED_00315",
+                            AltitudeKm = 563.59653913583452,
+                            Latitude = 39.319672542307387,
+                            Longitude = 175.85656793595132,
+                            Name = "Debris MC-315",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.9540207693139191
+                        },
+                        new
+                        {
+                            Id = "SEED_00316",
+                            AltitudeKm = 997.20410439055604,
+                            Latitude = -1.6504902353745337,
+                            Longitude = 143.7926650251228,
+                            Name = "Debris MC-316",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3464158998552787
+                        },
+                        new
+                        {
+                            Id = "SEED_00317",
+                            AltitudeKm = 1449.6329772982899,
+                            Latitude = -72.59799495460372,
+                            Longitude = -122.83905205449045,
+                            Name = "Debris MC-317",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.784574740465998
+                        },
+                        new
+                        {
+                            Id = "SEED_00318",
+                            AltitudeKm = 1416.013530230156,
+                            Latitude = 41.046725218671725,
+                            Longitude = -128.24840094346945,
+                            Name = "Debris MC-318",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4850952760247029
+                        },
+                        new
+                        {
+                            Id = "SEED_00319",
+                            AltitudeKm = 922.33004971515857,
+                            Latitude = -78.17472558849245,
+                            Longitude = -89.414481944131879,
+                            Name = "Debris MC-319",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2841608514004204
+                        },
+                        new
+                        {
+                            Id = "SEED_00320",
+                            AltitudeKm = 1309.7848008432356,
+                            Latitude = -18.481569824964538,
+                            Longitude = -86.001073078252873,
+                            Name = "Debris MC-320",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2194803854075635
+                        },
+                        new
+                        {
+                            Id = "SEED_00321",
+                            AltitudeKm = 415.81003205655611,
+                            Latitude = -74.890044315201251,
+                            Longitude = -58.920003901664174,
+                            Name = "Debris MC-321",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4907276690894395
+                        },
+                        new
+                        {
+                            Id = "SEED_00322",
+                            AltitudeKm = 483.02733161627657,
+                            Latitude = -55.715033060738364,
+                            Longitude = -148.29313984526934,
+                            Name = "Debris MC-322",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0409731255103711
+                        },
+                        new
+                        {
+                            Id = "SEED_00323",
+                            AltitudeKm = 999.84953026280243,
+                            Latitude = 46.424196472589017,
+                            Longitude = 25.129343776558215,
+                            Name = "Debris MC-323",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0777039793681835
+                        },
+                        new
+                        {
+                            Id = "SEED_00324",
+                            AltitudeKm = 672.60600066399479,
+                            Latitude = -52.495513289466274,
+                            Longitude = -134.92408759655621,
+                            Name = "Debris MC-324",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2595631921475583
+                        },
+                        new
+                        {
+                            Id = "SEED_00325",
+                            AltitudeKm = 732.77432584798635,
+                            Latitude = -77.898250859183378,
+                            Longitude = -129.44295424476405,
+                            Name = "Debris MC-325",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4565045735596236
+                        },
+                        new
+                        {
+                            Id = "SEED_00326",
+                            AltitudeKm = 1081.0602003620286,
+                            Latitude = 18.436516341025253,
+                            Longitude = -4.4683447221612198,
+                            Name = "Debris MC-326",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.1341422398733636
+                        },
+                        new
+                        {
+                            Id = "SEED_00327",
+                            AltitudeKm = 636.63441051572295,
+                            Latitude = -51.453837268731483,
+                            Longitude = -37.299523361632367,
+                            Name = "Debris MC-327",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2398217398393072
+                        },
+                        new
+                        {
+                            Id = "SEED_00328",
+                            AltitudeKm = 1483.8203206583021,
+                            Latitude = 35.086345656349479,
+                            Longitude = 111.72501473302253,
+                            Name = "Debris MC-328",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6860017423452813
+                        },
+                        new
+                        {
+                            Id = "SEED_00329",
+                            AltitudeKm = 962.48357755247673,
+                            Latitude = -63.539436158509659,
+                            Longitude = -153.59633075706489,
+                            Name = "Debris MC-329",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2317459309621466
+                        },
+                        new
+                        {
+                            Id = "SEED_00330",
+                            AltitudeKm = 348.56627362247849,
+                            Latitude = 54.524827704077978,
+                            Longitude = 31.386590735701191,
+                            Name = "Debris MC-330",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.012904791400258
+                        },
+                        new
+                        {
+                            Id = "SEED_00331",
+                            AltitudeKm = 1218.1651492222049,
+                            Latitude = -88.873625769686711,
+                            Longitude = -84.943656933002018,
+                            Name = "Debris MC-331",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2373504444199384
+                        },
+                        new
+                        {
+                            Id = "SEED_00332",
+                            AltitudeKm = 1238.0463094162037,
+                            Latitude = 10.898369988844891,
+                            Longitude = 136.1551040206827,
+                            Name = "Debris MC-332",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4107276517482141
+                        },
+                        new
+                        {
+                            Id = "SEED_00333",
+                            AltitudeKm = 446.65035351489223,
+                            Latitude = 79.401858928334832,
+                            Longitude = 64.403848799133584,
+                            Name = "Debris MC-333",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.3853325608118121
+                        },
+                        new
+                        {
+                            Id = "SEED_00334",
+                            AltitudeKm = 952.6741993858825,
+                            Latitude = 72.083314583675616,
+                            Longitude = 133.37434259866103,
+                            Name = "Debris MC-334",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8945344003823283
+                        },
+                        new
+                        {
+                            Id = "SEED_00335",
+                            AltitudeKm = 1235.6077170630952,
+                            Latitude = 33.380967994863624,
+                            Longitude = -177.45112795264046,
+                            Name = "Debris MC-335",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1911227385006491
+                        },
+                        new
+                        {
+                            Id = "SEED_00336",
+                            AltitudeKm = 1498.8695293659669,
+                            Latitude = 55.358268500006886,
+                            Longitude = -62.649018076550689,
+                            Name = "Debris MC-336",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.4213474092173151
+                        },
+                        new
+                        {
+                            Id = "SEED_00337",
+                            AltitudeKm = 1385.759424551278,
+                            Latitude = 14.99162378953379,
+                            Longitude = -134.68555908402686,
+                            Name = "Debris MC-337",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2025221007422182
+                        },
+                        new
+                        {
+                            Id = "SEED_00338",
+                            AltitudeKm = 344.15170235752674,
+                            Latitude = 13.165419568850396,
+                            Longitude = -123.83722323171665,
+                            Name = "Debris MC-338",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.72007044810805
+                        },
+                        new
+                        {
+                            Id = "SEED_00339",
+                            AltitudeKm = 1457.694497312277,
+                            Latitude = -72.006418165753786,
+                            Longitude = -53.264852181666001,
+                            Name = "Debris MC-339",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5075695400627191
+                        },
+                        new
+                        {
+                            Id = "SEED_00340",
+                            AltitudeKm = 934.6579919730583,
+                            Latitude = 40.041055255588617,
+                            Longitude = -2.6460465521766139,
+                            Name = "Debris MC-340",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.5039050893410604
+                        },
+                        new
+                        {
+                            Id = "SEED_00341",
+                            AltitudeKm = 1362.5116656825467,
+                            Latitude = 20.643291906753234,
+                            Longitude = -57.584313264854401,
+                            Name = "Debris MC-341",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.0240368438065222
+                        },
+                        new
+                        {
+                            Id = "SEED_00342",
+                            AltitudeKm = 968.24596331838802,
+                            Latitude = 33.864954339277446,
+                            Longitude = 82.666281602655658,
+                            Name = "Debris MC-342",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.414778271184665
+                        },
+                        new
+                        {
+                            Id = "SEED_00343",
+                            AltitudeKm = 862.85695813729285,
+                            Latitude = 5.3007047135851764,
+                            Longitude = 164.05681717398426,
+                            Name = "Debris MC-343",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1937532640033179
+                        },
+                        new
+                        {
+                            Id = "SEED_00344",
+                            AltitudeKm = 541.268709786827,
+                            Latitude = 55.352137808386288,
+                            Longitude = -91.299575153412107,
+                            Name = "Debris MC-344",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.0204240272382386
+                        },
+                        new
+                        {
+                            Id = "SEED_00345",
+                            AltitudeKm = 989.93619693905873,
+                            Latitude = -42.30225787139603,
+                            Longitude = 114.32616655450602,
+                            Name = "Debris MC-345",
+                            Source = "local_seed",
+                            Type = "satellite",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.6520095794238197
+                        },
+                        new
+                        {
+                            Id = "SEED_00346",
+                            AltitudeKm = 740.81265760623512,
+                            Latitude = 85.213638327649619,
+                            Longitude = 52.808588646728822,
+                            Name = "Debris MC-346",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.1776705878682758
+                        },
+                        new
+                        {
+                            Id = "SEED_00347",
+                            AltitudeKm = 488.30883642114179,
+                            Latitude = 25.579169045937789,
+                            Longitude = 51.178198508535587,
+                            Name = "Debris MC-347",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.8226311722875721
+                        },
+                        new
+                        {
+                            Id = "SEED_00348",
+                            AltitudeKm = 1348.6871519352715,
+                            Latitude = 73.032996702488958,
+                            Longitude = -106.01442979928778,
+                            Name = "Debris MC-348",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.2891999272579326
+                        },
+                        new
+                        {
+                            Id = "SEED_00349",
+                            AltitudeKm = 515.27624475549737,
+                            Latitude = -3.9242627722789791,
+                            Longitude = -20.254906322925791,
+                            Name = "Debris MC-349",
+                            Source = "local_seed",
+                            Type = "debris",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 7.7012535427702842
+                        },
+                        new
+                        {
+                            Id = "SEED_00350",
+                            AltitudeKm = 611.31156511200197,
+                            Latitude = -10.701258890657343,
+                            Longitude = 173.89201629622471,
+                            Name = "Debris MC-350",
+                            Source = "local_seed",
+                            Type = "rocket_body",
+                            UpdatedAt = new DateTime(2026, 5, 29, 0, 0, 0, 0, DateTimeKind.Utc),
+                            VelocityKmS = 8.2804873582350496
+                        });
                 });
 
             modelBuilder.Entity("MissionClear.Api.Entities.RefreshTokenEntity", b =>

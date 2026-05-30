@@ -23,7 +23,16 @@ public static class Extensions
         builder.Services.AddServiceDiscovery();
         builder.Services.ConfigureHttpClientDefaults(http =>
         {
-            http.AddStandardResilienceHandler();
+            http.AddStandardResilienceHandler(options =>
+            {
+                // Polly constraint: CircuitBreaker.SamplingDuration >= 2 × AttemptTimeout.
+                // 60s attempt timeout requires SamplingDuration >= 120s.
+                options.AttemptTimeout.Timeout                  = TimeSpan.FromSeconds(60);
+                options.TotalRequestTimeout.Timeout             = TimeSpan.FromSeconds(180);
+                options.CircuitBreaker.SamplingDuration         = TimeSpan.FromSeconds(120);
+                options.Retry.MaxRetryAttempts                  = 2;
+                options.Retry.Delay                             = TimeSpan.FromSeconds(5);
+            });
             http.AddServiceDiscovery();
         });
         return builder;

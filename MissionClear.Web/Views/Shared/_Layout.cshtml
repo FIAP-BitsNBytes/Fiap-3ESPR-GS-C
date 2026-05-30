@@ -1,50 +1,59 @@
-﻿<!DOCTYPE html>
-<html lang="en">
+<!DOCTYPE html>
+<html lang="pt-BR">
 <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>@ViewData["Title"] - MissionClear.Web</title>
-    <script type="importmap"></script>
-    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
-    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
-    <link rel="stylesheet" href="~/MissionClear.Web.styles.css" asp-append-version="true" />
+    <title>Mission Clear — @ViewData["Title"]</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        body { font-family: sans-serif; margin: 0; background: #0a0a1a; color: #e0e0ff; }
+        nav { background: #111133; padding: 1rem 2rem; display: flex; gap: 1.5rem; align-items: center; }
+        nav a { color: #88aaff; text-decoration: none; }
+        nav a:hover { color: #fff; }
+        .main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        .card { background: #111133; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
+        .btn { padding: .5rem 1.5rem; border-radius: 4px; border: none; cursor: pointer; }
+        .btn-primary { background: #4466ff; color: white; }
+        .btn-danger { background: #cc3333; color: white; }
+        input, select { padding: .5rem; border-radius: 4px; border: 1px solid #334; background: #0a0a1a; color: #e0e0ff; width: 100%; margin-bottom: .75rem; }
+        label { display: block; margin-bottom: .25rem; font-size: .9rem; color: #aaa; }
+        .error { color: #ff6666; margin-bottom: 1rem; }
+        .badge { padding: .2rem .6rem; border-radius: 99px; font-size: .75rem; }
+        .badge-success { background: #1a4433; color: #44ff88; }
+        .badge-failure { background: #441a1a; color: #ff6666; }
+        .badge-admin { background: #441111; color: #ff4444; }
+        .stat { display: inline-block; margin-right: 2rem; }
+        .stat-value { font-size: 2rem; font-weight: bold; color: #88aaff; }
+        .stat-label { font-size: .8rem; color: #888; }
+    </style>
 </head>
 <body>
-    <header>
-        <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
-            <div class="container-fluid">
-                <a class="navbar-brand" asp-area="" asp-controller="Home" asp-action="Index">MissionClear.Web</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target=".navbar-collapse" aria-controls="navbarSupportedContent"
-                        aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="navbar-collapse collapse d-sm-inline-flex justify-content-between">
-                    <ul class="navbar-nav flex-grow-1">
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Index">Home</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link text-dark" asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
-    <div class="container">
-        <main role="main" class="pb-3">
-            @RenderBody()
-        </main>
+    <nav>
+        <strong style="color:#fff;font-size:1.2rem">🚀 Mission Clear</strong>
+        <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <a asp-controller="Missions" asp-action="Index">Missões</a>
+        }
+        @if (User.IsInRole("Administrator"))
+        {
+            <a asp-controller="Users" asp-action="Index">Usuários</a>
+        }
+        <span style="flex:1"></span>
+        @if (User.Identity?.IsAuthenticated == true)
+        {
+            <span style="color:#aaa;font-size:.9rem">@User.Identity.Name</span>
+            <form asp-controller="Auth" asp-action="Logout" method="post" style="display:inline">
+                <button type="submit" class="btn btn-danger" style="padding:.3rem 1rem;font-size:.85rem">Sair</button>
+            </form>
+        }
+        else
+        {
+            <a asp-controller="Auth" asp-action="Login">Entrar</a>
+            <a asp-controller="Auth" asp-action="Register">Registrar</a>
+        }
+    </nav>
+    <div class="main">
+        @RenderBody()
     </div>
-
-    <footer class="border-top footer text-muted">
-        <div class="container">
-            &copy; 2026 - MissionClear.Web - <a asp-area="" asp-controller="Home" asp-action="Privacy">Privacy</a>
-        </div>
-    </footer>
-    <script src="~/lib/jquery/dist/jquery.min.js"></script>
-    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="~/js/site.js" asp-append-version="true"></script>
-    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>
