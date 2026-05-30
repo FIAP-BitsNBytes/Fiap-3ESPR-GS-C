@@ -22,17 +22,18 @@
 3. [Envelope de Erro](#3-envelope-de-erro)
 4. [Destinos Válidos](#4-destinos-válidos)
 5. [Rotas — Auth](#5-rotas--auth)
-6. [Rotas — Usuário](#6-rotas--usuário)
+6. [Rotas — Usuário](#6-rotas--usuário) (inclui favoritos)
 7. [Rotas — Orbital (Público)](#7-rotas--orbital-público)
 8. [Rotas — Janelas de Lançamento](#8-rotas--janelas-de-lançamento)
 9. [Rotas — Simulação de Missão](#9-rotas--simulação-de-missão)
 10. [Rotas — Histórico de Missões](#10-rotas--histórico-de-missões)
 11. [Rotas — Dashboard](#11-rotas--dashboard)
 12. [Rotas — Sistema](#12-rotas--sistema)
-13. [SSE — Protocolo de Streaming](#13-sse--protocolo-de-streaming)
-14. [Códigos de Erro](#14-códigos-de-erro)
-15. [Referência de Campos](#15-referência-de-campos)
-16. [Mocks para Mobile](#16-mocks-para-mobile)
+13. [Rotas — Admin](#13-rotas--admin)
+14. [SSE — Protocolo de Streaming](#14-sse--protocolo-de-streaming)
+15. [Códigos de Erro](#15-códigos-de-erro)
+16. [Referência de Campos](#16-referência-de-campos)
+17. [Mocks para Mobile](#17-mocks-para-mobile)
 
 ---
 
@@ -317,6 +318,74 @@ Atualiza perfil do usuário.
 |---|---|---|
 | `401` | `INVALID_CURRENT_PASSWORD` | current_password incorreta |
 | `400` | `INVALID_PASSWORD_FORMAT` | Nova senha não atende requisitos |
+
+---
+
+### GET /api/users/me/favorites 🔑
+
+Retorna detritos favoritados e janelas de lançamento salvas do usuário autenticado.
+
+**Response — 200 OK:**
+```json
+{
+  "debris_ids": ["25544", "37820"],
+  "windows": [
+    {
+      "id": "ISS_2026-06-01T08:00:00Z",
+      "destination": "ISS",
+      "saved_at": "2026-05-30T12:00:00Z"
+    }
+  ],
+  "updated_at": "2026-05-30T12:00:00Z"
+}
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `debris_ids` | `string[]` | NORAD IDs dos detritos favoritados (max 500) |
+| `windows` | `object[]` | Janelas de lançamento salvas — round-trip do JSON enviado pelo Mobile |
+| `updated_at` | `string` | ISO 8601 UTC do item mais recentemente salvo |
+
+**Erros:**
+| HTTP | `error` | Quando |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | Sem token |
+| `404` | `USER_NOT_FOUND` | Token válido mas conta não existe |
+
+---
+
+### PUT /api/users/me/favorites 🔑
+
+Substitui atomicamente os favoritos do usuário. Campos `null` são ignorados (patch parcial).
+
+**Request Body:**
+```json
+{
+  "debris_ids": ["25544", "37820"],
+  "windows": [
+    {
+      "id": "ISS_2026-06-01T08:00:00Z",
+      "destination": "ISS",
+      "saved_at": "2026-05-30T12:00:00Z"
+    }
+  ]
+}
+```
+
+| Campo | Tipo | Regras |
+|---|---|---|
+| `debris_ids` | `string[]?` | Se presente: substitui todos os debris favoritados (max 500). `null` = sem alteração. |
+| `windows` | `object[]?` | Se presente: substitui todas as janelas salvas (max 200). `null` = sem alteração. Cada objeto deve ter `id` e `destination`. |
+
+**Response — 200 OK:** mesmo shape de `GET /api/users/me/favorites` (estado após a substituição)
+
+> **Comportamento de replace:** cada campo substituído atomicamente (remove todos + insere novos em uma única transação). Enviar `debris_ids: []` limpa todos os debris favoritados.
+
+**Erros:**
+| HTTP | `error` | Quando |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | Sem token |
+| `404` | `USER_NOT_FOUND` | Token válido mas conta não existe |
 
 ---
 
@@ -664,7 +733,7 @@ Cria uma sessão de simulação dinâmica (SSE). Retorna `session_id` para abrir
 
 ### GET /api/mission/session/{sessionId}/stream 🔓
 
-Abre stream SSE da simulação dinâmica. Ver §13 para formato detalhado dos eventos.
+Abre stream SSE da simulação dinâmica. Ver §14 para formato detalhado dos eventos.
 
 **Headers obrigatórios no Mobile:**
 ```
@@ -984,7 +1053,42 @@ Estado da API. Mobile deve verificar antes de iniciar qualquer request orbital.
 
 ---
 
-## 13. SSE — Protocolo de Streaming
+## 13. Rotas — Admin
+
+Todas requerem role `Administrator`. Uso interno / devops — nunca chamar do Mobile.
+
+### POST /api/admin/refresh 🔑 (Administrator only)
+
+Força fetch imediato de TLEs do CelesTrak sem aguardar o intervalo automático de 60 minutos.
+Útil em desenvolvimento e para validar dados ao vivo durante apresentação.
+
+> **Aviso:** operação **síncrona** — pode levar até 60 s dependendo do número de catálogos e latência de rede. Configure o timeout do HTTP client em > 90 s para esta rota.
+
+**Response — 200 OK:**
+```json
+{
+  "objects_in_cache": 18432,
+  "last_fetch": "2026-05-30T15:00:00Z",
+  "message": "Refresh complete. 18432 objects now in cache."
+}
+```
+
+| Campo | Tipo | Descrição |
+|---|---|---|
+| `objects_in_cache` | `integer` | Objetos no cache após o refresh |
+| `last_fetch` | `string` | ISO 8601 UTC do fetch concluído |
+| `message` | `string` | Mensagem legível para o operador |
+
+**Erros:**
+| HTTP | `error` | Quando |
+|---|---|---|
+| `401` | `UNAUTHORIZED` | Sem token |
+| `403` | `FORBIDDEN` | Token válido mas role ≠ Administrator |
+| `503` | `CACHE_NOT_READY` | CelesTrak inacessível e fallback de DB falhou |
+
+---
+
+## 14. SSE — Protocolo de Streaming
 
 O stream SSE da rota `GET /api/mission/session/{sessionId}/stream` emite eventos no formato padrão:
 
@@ -1077,7 +1181,7 @@ Se a conexão cair, o Mobile deve:
 
 ---
 
-## 14. Códigos de Erro
+## 15. Códigos de Erro
 
 | Código | HTTP | Descrição |
 |---|---|---|
@@ -1106,7 +1210,7 @@ Se a conexão cair, o Mobile deve:
 
 ---
 
-## 15. Referência de Campos
+## 16. Referência de Campos
 
 Todos os campos usados na API — referência rápida para evitar inconsistências.
 
@@ -1228,7 +1332,7 @@ Todos os campos usados na API — referência rápida para evitar inconsistênci
 
 ---
 
-## 16. Mocks para Mobile
+## 17. Mocks para Mobile
 
 O Mobile pode desenvolver com estes JSONs estáticos antes do backend estar pronto.
 
@@ -1326,7 +1430,7 @@ data: {"status":"success","mission_score":87,"risk_score":0.1240,"delta_v_km_s":
 
 ---
 
-## 17. Mobile — Variáveis de Ambiente
+## 18. Mobile — Variáveis de Ambiente
 
 > React Native não tem `.env` nativo. Use `react-native-config` (bare) ou `expo-constants` + `app.config.ts` (Expo).
 
@@ -1337,7 +1441,7 @@ data: {"status":"success","mission_score":87,"risk_score":0.1240,"delta_v_km_s":
 | `API_URL` | sim | `http://localhost:5000` | Base URL da API. Sem barra no final. |
 | `API_TIMEOUT_MS` | não | `15000` | Timeout das requests REST (não aplica a SSE). |
 | `ENV` | sim | `dev` | `dev` \| `staging` \| `prod`. |
-| `SSE_RECONNECT_DELAY_MS` | não | `3000` | Delay base de reconexão SSE (§13 = 3s). |
+| `SSE_RECONNECT_DELAY_MS` | não | `3000` | Delay base de reconexão SSE (§14 = 3s). |
 | `CACHE_RETRY_DELAY_MS` | não | `30000` | Delay de retry para `CACHE_NOT_READY`. |
 | `TOKEN_REFRESH_SKEW_S` | não | `60` | Margem para refresh proativo antes de `expires_in`. |
 | `ENABLE_DEBUG_LOGS` | não | `true` | Liga logs de request/response. Sempre `false` em prod. |
@@ -1375,7 +1479,7 @@ ENABLE_DEBUG_LOGS=true
 
 ---
 
-## 18. Mobile — Interceptor de Request
+## 19. Mobile — Interceptor de Request
 
 ### Armazenamento de token
 
@@ -1426,7 +1530,7 @@ httpClient.interceptors.request.use(async (config) => {
 
 ---
 
-## 19. Mobile — Interceptor de Response
+## 20. Mobile — Interceptor de Response
 
 Todo erro chega no envelope `{ error, message, timestamp }` (§3). O app exibe mensagens próprias por código `error`, **nunca** o campo `message` (é para desenvolvedor).
 
@@ -1516,7 +1620,7 @@ httpClient.interceptors.response.use(
 
 ---
 
-## 20. Mobile — Fluxo de Autenticação Completo
+## 21. Mobile — Fluxo de Autenticação Completo
 
 ### Login
 
@@ -1573,7 +1677,7 @@ Em paralelo:
 
 ---
 
-## 21. Mobile — Fluxo Anônimo vs Autenticado
+## 22. Mobile — Fluxo Anônimo vs Autenticado
 
 ### Detecção de estado
 
@@ -1620,7 +1724,7 @@ Body: { "status": "success", "save_to_history": true }
 
 ---
 
-## 22. Mobile — SSE (Server-Sent Events)
+## 23. Mobile — SSE (Server-Sent Events)
 
 > `fetch`/`XMLHttpRequest` nativos do RN não expõem streaming confiável. Use **`react-native-sse`** (suporta headers customizados, essencial para Bearer e `Last-Event-ID`).
 
@@ -1700,7 +1804,7 @@ function scheduleReconnect() {
       pollingInterval: 0,
     });
     bindHandlers(next); // re-registra listeners
-  }, SSE_RECONNECT_DELAY_MS); // 3000ms padrão (§13)
+  }, SSE_RECONNECT_DELAY_MS); // 3000ms padrão (§14)
 }
 ```
 
@@ -1726,7 +1830,7 @@ Fechar em: unmount, navegação para fora, `session_complete`, logout.
 
 ---
 
-## 23. Mobile — Identificação do Usuário
+## 24. Mobile — Identificação do Usuário
 
 ### O backend extrai userId do JWT — mobile NÃO envia userId
 
@@ -1753,7 +1857,7 @@ const claims = jwtDecode<AccessClaims>(accessToken);
 
 ---
 
-## 24. Mobile — Regras de Negócio
+## 25. Mobile — Regras de Negócio
 
 ### Sessão de simulação expira em 30 min
 
@@ -1800,3 +1904,5 @@ const claims = jwtDecode<AccessClaims>(accessToken);
 | 2026-05-26 | 2.0.0 | Auth JWT, histórico de missões, SSE dinâmico, dashboard completo, /api/destinations, /api/debris/stats, /api/debris/{id}, /api/launch-windows/best |
 | 2026-05-28 | 2.1.0 | Adicionado `role` em todas responses de usuário; `aborted_missions` em stats de `/users/me`; formato de ID documentado (Guid:N); nota Aspire porta dinâmica; `USER_NOT_FOUND` no catálogo de erros; `duration_seconds` como number; seções 17–24 integração mobile (env, interceptors, SSE, auth flow, regras) |
 | 2026-05-28 | 2.2.0 | Formato `id:` do protocolo SSE documentado; token rotation explicitado (sem rotation, refresh_token permanece); mocks adicionados para /simulate, /users/me, /missions/{id}, /dashboard/summary (anônimo+auth), /dashboard/alerts, /session/complete — auditoria mobile score 91/100, zero bloqueantes |
+| 2026-05-30 | 2.3.0 | Rotas de favoritos documentadas: `GET /api/users/me/favorites` e `PUT /api/users/me/favorites` — replace atômico de debris_ids e windows com patch parcial por null |
+| 2026-05-30 | 2.4.0 | `POST /api/admin/refresh` — forçar atualização de TLEs sem restart; requer role Administrator; nova §13 Admin; seções §14–§25 renumeradas |
