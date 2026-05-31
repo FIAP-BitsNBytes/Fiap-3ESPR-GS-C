@@ -71,7 +71,7 @@ public sealed class MissionSimulationService(
             session.Destination,
             session.DepartureTime.ToString("O"),
             session.ArrivalTime.ToString("O"),
-            $"/api/simulation/stream/{session.SessionId}",
+            $"/api/mission/session/{session.SessionId}/stream",
             session.ExpiresAt.ToString("O")));
     }
 

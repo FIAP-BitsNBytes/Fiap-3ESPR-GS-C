@@ -4,7 +4,8 @@ using Microsoft.Extensions.Logging;
 
 var builder = DistributedApplication.CreateBuilder(args);
 
-var api = builder.AddProject<Projects.MissionClear_Api>("api");
+var api = builder.AddProject<Projects.MissionClear_Api>("api")
+    .WithHttpEndpoint(port: 5273, name: "http");
 
 builder.AddProject<Projects.MissionClear_Web>("web")
     .WithReference(api)

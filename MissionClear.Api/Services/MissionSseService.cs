@@ -22,70 +22,109 @@ public sealed class MissionSseService(
         var session = sessions.Get(sessionId);
         if (session == null) return;
 
-        response.Headers.Append("Content-Type", "text/event-stream");
-        response.Headers.Append("Cache-Control", "no-cache");
-        response.Headers.Append("Connection", "keep-alive");
-
         var dest = KnownDestinations.FindById(session.Destination);
         if (dest == null) return;
 
-        var debris = cache.GetAll();
-        var random = new Random();
+        var debris    = cache.GetAll();
+        var debrisMap = debris.ToDictionary(d => d.Id);
+        var alerted   = new HashSet<string>();
 
-        // Simulation loop: 10 steps (0 to 100%)
+        // Simulation always runs to completion (5.5s) regardless of client disconnect.
+        // Task.Delay does NOT pass ct — a mid-loop disconnect must not abort the loop.
+        // SendEvent is wrapped so write failures don't stop the loop either.
         for (int i = 0; i <= 100; i += 10)
         {
-            if (ct.IsCancellationRequested) break;
+            // ── heartbeat ────────────────────────────────────────────────────
+            await TrySendEvent(response, "heartbeat",
+                new { timestamp = DateTime.UtcNow.ToString("O") }, ct);
 
-            // 1. Broadcast Progress
-            await SendEvent(response, "progress", new { percentage = i }, ct);
-
-            // 2. Proximity check at current simulation point
-            var simTime = session.DepartureTime.AddSeconds((session.ArrivalTime - session.DepartureTime).TotalSeconds * (i / 100.0));
+            // ── detect conjunctions at this trajectory point ──────────────
+            var elapsed      = (session.ArrivalTime - session.DepartureTime).TotalSeconds * (i / 100.0);
+            var simTime      = session.DepartureTime.AddSeconds(elapsed);
             var conjunctions = detector.Detect(dest, simTime, debris);
 
-            foreach (var c in conjunctions)
+            // ── debris_update ─────────────────────────────────────────────
+            var objects = conjunctions.Select(c =>
             {
-                if (c.RiskLevel >= RiskLevel.High)
+                debrisMap.TryGetValue(c.DebrisId, out var obj);
+                return new
                 {
-                    session.ObstaclesEncountered++;
-                    session.Conjunctions.Add(c);
-                    
-                    await SendEvent(response, "obstacle", new
-                    {
-                        debris_id                = c.DebrisId,
-                        debris_name              = c.DebrisName,
-                        closest_approach_km      = c.ClosestApproachKm,
-                        time_of_closest_approach = c.TimeOfClosestApproach.ToString("O"),
-                        risk_level               = c.RiskLevel.ToString().ToLowerInvariant()
-                    }, ct);
-                }
+                    id                          = c.DebrisId,
+                    name                        = c.DebrisName,
+                    latitude                    = obj?.Latitude  ?? 0.0,
+                    longitude                   = obj?.Longitude ?? 0.0,
+                    altitude_km                 = obj?.AltitudeKm  ?? 0.0,
+                    velocity_km_s               = obj?.VelocityKmS ?? 0.0,
+                    distance_from_trajectory_km = c.ClosestApproachKm
+                };
+            }).ToList();
+
+            await TrySendEvent(response, "debris_update",
+                new { timestamp = DateTime.UtcNow.ToString("O"), objects }, ct);
+
+            // ── conjunction_alert — high-risk, once per debris id ─────────
+            foreach (var c in conjunctions.Where(c => c.RiskLevel >= RiskLevel.High))
+            {
+                if (!alerted.Add(c.DebrisId)) continue;
+
+                session.ObstaclesEncountered++;
+                session.Conjunctions.Add(c);
+
+                var secondsUntil = Math.Max(0, (int)(c.TimeOfClosestApproach - simTime).TotalSeconds);
+
+                await TrySendEvent(response, "conjunction_alert", new
+                {
+                    debris_id                 = c.DebrisId,
+                    debris_name               = c.DebrisName,
+                    closest_approach_km       = c.ClosestApproachKm,
+                    time_of_closest_approach  = c.TimeOfClosestApproach.ToString("O"),
+                    risk_level                = c.RiskLevel.ToString().ToLowerInvariant(),
+                    seconds_until_conjunction = secondsUntil
+                }, ct);
             }
 
-            // 3. Update session safety score based on cumulative conjunctions
-            session.RiskScore = RiskScoring.ComputeScore(session.Conjunctions.Select(c => c.ClosestApproachKm));
+            // update running scores
+            session.RiskScore = RiskScoring.ComputeScore(
+                session.Conjunctions.Select(c => c.ClosestApproachKm));
             session.DeltaVKmS = dest.DeltaVKmS;
 
-            await Task.Delay(500, ct); // Pace the simulation
+            // Delay without ct so a client disconnect doesn't abort the loop
+            await Task.Delay(500);
         }
 
-        // Final event
-        var (eff, saf, total) = MissionScoring.Compute(session.DeltaVKmS, session.RiskScore);
-        await SendEvent(response, "result", new
+        // ── session_complete — always fires ───────────────────────────────
+        var (_, _, total) = MissionScoring.Compute(session.DeltaVKmS, session.RiskScore);
+        session.MissionScore = total;
+
+        var finalStatus = session.RiskScore >= 0.7 ? "failure" : "success";
+
+        await TrySendEvent(response, "session_complete", new
         {
-            status        = "completed",
-            mission_score = total,
-            risk_score    = Math.Round(session.RiskScore, 4),
-            delta_v_km_s  = session.DeltaVKmS
+            status                = finalStatus,
+            mission_score         = total,
+            risk_score            = Math.Round(session.RiskScore, 4),
+            delta_v_km_s          = session.DeltaVKmS,
+            obstacles_encountered = session.ObstaclesEncountered
         }, ct);
     }
 
-    private static async Task SendEvent(HttpResponse response, string eventName, object data, CancellationToken ct)
+    // SendEvent that swallows write errors (client may have disconnected).
+    // The session state is already updated in-memory; the event is best-effort.
+    private static async Task TrySendEvent(
+        HttpResponse response,
+        string eventName,
+        object data,
+        CancellationToken ct)
     {
-        var json = JsonSerializer.Serialize(data, JsonOptions);
-        var payload = $"event: {eventName}\ndata: {json}\n\n";
-        var bytes = Encoding.UTF8.GetBytes(payload);
-        await response.Body.WriteAsync(bytes, ct);
-        await response.Body.FlushAsync(ct);
+        try
+        {
+            var json    = JsonSerializer.Serialize(data, JsonOptions);
+            var payload = $"event: {eventName}\ndata: {json}\n\n";
+            var bytes   = Encoding.UTF8.GetBytes(payload);
+            await response.Body.WriteAsync(bytes, ct);
+            await response.Body.FlushAsync(ct);
+        }
+        catch (OperationCanceledException) { }
+        catch (IOException) { }
     }
 }
