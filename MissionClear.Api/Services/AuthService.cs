@@ -51,27 +51,17 @@ public sealed class AuthService(
         return await BuildAuthResponseAsync(user, ct);
     }
 
+    // No rotation: the same refresh_token remains valid until its ExpiresAt.
+    // Mobile stores the original token and reuses it — do NOT revoke it here.
     public async Task<RefreshTokenResponse> RefreshAsync(RefreshRequest request, CancellationToken ct = default)
     {
         var existing = await tokenRepo.GetByTokenAsync(request.RefreshToken, ct);
-        
+
         if (existing is null || existing.IsRevoked || existing.ExpiresAt < DateTime.UtcNow)
             throw new DomainException("INVALID_REFRESH_TOKEN", "Token invalid or expired.", 401);
 
         var user = await userRepo.GetByIdAsync(existing.UserId, ct)
             ?? throw new DomainException("INVALID_REFRESH_TOKEN", "User not found.", 401);
-
-        await tokenRepo.RevokeByTokenAsync(request.RefreshToken, ct);
-        await tokenRepo.SaveChangesAsync(ct);
-
-        var newRefreshToken = new RefreshTokenEntity
-        {
-            UserId = user.Id,
-            Token = jwtService.GenerateRefreshToken(),
-            ExpiresAt = DateTime.UtcNow.AddDays(jwtOptions.Value.RefreshTokenDays)
-        };
-        await tokenRepo.AddAsync(newRefreshToken, ct);
-        await tokenRepo.SaveChangesAsync(ct);
 
         return new RefreshTokenResponse(
             jwtService.GenerateAccessToken(user),
