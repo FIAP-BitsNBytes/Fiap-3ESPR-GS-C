@@ -48,9 +48,17 @@ public sealed class DataAggregatorService : IDataAggregatorService
         var allObjects = new Dictionary<string, OrbitalObject>(StringComparer.Ordinal);
         var anySucceeded = false;
         var isFirst = true;
+        var networkBlocked = false;
 
         foreach (var catalog in _settings.CelesTrakCatalogs)
         {
+            if (networkBlocked)
+            {
+                _logger.LogDebug(
+                    "CelesTrak [{Label}]: skipping — network unreachable", catalog.Label);
+                continue;
+            }
+
             if (!isFirst && _settings.CelesTrakRequestDelaySeconds > 0)
             {
                 _logger.LogDebug(
@@ -82,6 +90,13 @@ public sealed class DataAggregatorService : IDataAggregatorService
             {
                 _logger.LogWarning(ex,
                     "CelesTrak [{Label}] fetch failed — skipping catalog", catalog.Label);
+
+                if (IsNetworkUnreachable(ex))
+                {
+                    networkBlocked = true;
+                    _logger.LogWarning(
+                        "CelesTrak host unreachable — skipping remaining catalogs and using fallback");
+                }
             }
         }
 
@@ -92,6 +107,15 @@ public sealed class DataAggregatorService : IDataAggregatorService
             foreach (var obj in seed)
                 allObjects[obj.Id] = obj;
             _logger.LogInformation("Database fallback: loaded {Count} records", allObjects.Count);
+
+            if (allObjects.Count == 0)
+            {
+                _logger.LogWarning("Database empty — loading embedded TLE seed for offline operation");
+                var embedded = LoadEmbeddedSeed();
+                foreach (var obj in embedded)
+                    allObjects[obj.Id] = obj;
+                _logger.LogInformation("Embedded TLE seed: {Count} objects loaded", allObjects.Count);
+            }
         }
 
         var keeptrack = await TryFetchKeepTrackAsync(ct);
@@ -241,6 +265,37 @@ public sealed class DataAggregatorService : IDataAggregatorService
         }
 
         return objects;
+    }
+
+    // ── Network diagnostics ───────────────────────────────────────────────────
+
+    private static bool IsNetworkUnreachable(Exception ex)
+    {
+        if (ex is HttpRequestException { InnerException: System.Net.Sockets.SocketException })
+            return true;
+        if (ex is HttpRequestException { InnerException: TaskCanceledException { InnerException: TimeoutException } })
+            return true;
+        if (ex is HttpRequestException httpEx &&
+            (httpEx.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
+             httpEx.Message.Contains("TimedOut", StringComparison.OrdinalIgnoreCase)))
+            return true;
+        return false;
+    }
+
+    // ── Embedded TLE seed (offline fallback) ─────────────────────────────────
+
+    private IReadOnlyList<OrbitalObject> LoadEmbeddedSeed()
+    {
+        const string resourceName = "MissionClear.Api.Data.Seeds.debris_seed.tle";
+        var asm = typeof(DataAggregatorService).Assembly;
+        using var stream = asm.GetManifestResourceStream(resourceName);
+        if (stream is null)
+        {
+            _logger.LogError("Embedded seed resource '{Resource}' not found in assembly", resourceName);
+            return [];
+        }
+        using var reader = new StreamReader(stream);
+        return ParseTleText(reader.ReadToEnd(), "celestrak-debris");
     }
 
     // ── Database fallback ─────────────────────────────────────────────────────

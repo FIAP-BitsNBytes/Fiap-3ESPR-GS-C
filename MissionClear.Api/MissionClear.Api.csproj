@@ -23,4 +23,8 @@
   <ItemGroup>
     <ProjectReference Include="..\MissionClear.ServiceDefaults\MissionClear.ServiceDefaults.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <EmbeddedResource Include="Data\Seeds\debris_seed.tle" />
+  </ItemGroup>
 </Project>

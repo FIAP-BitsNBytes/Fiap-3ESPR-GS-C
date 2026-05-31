@@ -133,7 +133,7 @@ builder.Services.AddHttpClient("celestrak", client =>
     client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
     client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
     client.DefaultRequestHeaders.Add("DNT", "1");
-    client.Timeout = TimeSpan.FromSeconds(60);
+    client.Timeout = TimeSpan.FromSeconds(12);
 });
 builder.Services.AddHttpClient("keeptrack", client =>
 {
