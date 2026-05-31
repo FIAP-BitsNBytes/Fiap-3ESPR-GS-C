@@ -78,8 +78,7 @@ public sealed class DataAggregatorService : IDataAggregatorService
 
                 anySucceeded = true;
             }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-            catch (Exception ex)
+            catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
             {
                 _logger.LogWarning(ex,
                     "CelesTrak [{Label}] fetch failed — skipping catalog", catalog.Label);
@@ -125,7 +124,18 @@ public sealed class DataAggregatorService : IDataAggregatorService
 
         _logger.LogDebug("CelesTrak [{Label}]: GET {Url}", catalog.Label, catalog.Url);
 
-        using var response = await client.SendAsync(request, ct);
+        HttpResponseMessage response;
+        try
+        {
+            response = await client.SendAsync(request, ct);
+        }
+        catch (TaskCanceledException ex) when (!ct.IsCancellationRequested)
+        {
+            // HttpClient.Timeout fired — not a genuine cancellation. Re-throw as
+            // HttpRequestException so the outer per-catalog catch can skip it.
+            throw new HttpRequestException(
+                $"CelesTrak [{catalog.Label}]: request timed out", ex);
+        }
 
         if (response.StatusCode == HttpStatusCode.NotModified)
         {

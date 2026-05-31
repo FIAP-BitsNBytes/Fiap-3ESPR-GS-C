@@ -76,8 +76,7 @@ public sealed class TleIngestionService : BackgroundService
             _logger.LogInformation("TleIngestion: fetch complete — {Count} objects in cache", _cache.Count);
             return true;
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex)
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
         {
             _logger.LogError(ex, "TleIngestion: fetch cycle failed — will retry at next interval");
             return false;
@@ -122,8 +121,7 @@ public sealed class TleIngestionService : BackgroundService
                 "TleIngestion: propagated {Count}/{Total} objects in {Ms} ms",
                 propagated.Count, objects.Count, sw.ElapsedMilliseconds);
         }
-        catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
-        catch (Exception ex)
+        catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
         {
             _logger.LogError(ex, "TleIngestion: propagation cycle failed — will retry at next interval");
         }
