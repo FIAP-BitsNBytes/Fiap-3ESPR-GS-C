@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using MissionClear.Api.Data.Repositories;
 using MissionClear.Api.Dtos.User;
@@ -7,7 +8,10 @@ using MissionClear.Api.Services.Interfaces;
 
 namespace MissionClear.Api.Services;
 
-public sealed class UserService(IUserRepository userRepo, IMissionRepository missionRepo) : IUserService
+public sealed class UserService(
+    IUserRepository userRepo,
+    IMissionRepository missionRepo,
+    IFavoritesRepository favoritesRepo) : IUserService
 {
     private static readonly Regex PasswordRegex =
         new(@"^(?=.*[A-Z])(?=.*\d).{8,}$", RegexOptions.Compiled);
@@ -55,6 +59,69 @@ public sealed class UserService(IUserRepository userRepo, IMissionRepository mis
         }
         
         return await BuildProfileAsync(user, ct);
+    }
+
+    public async Task<FavoritesResponse> GetFavoritesAsync(Guid userId, CancellationToken ct = default)
+    {
+        if (await userRepo.GetByIdAsync(userId, ct) is null)
+            throw new DomainException("USER_NOT_FOUND", "User not found.", 404);
+
+        var debris  = await favoritesRepo.GetDebrisAsync(userId, ct);
+        var windows = await favoritesRepo.GetWindowsAsync(userId, ct);
+
+        return BuildFavoritesResponse(debris, windows);
+    }
+
+    public async Task<FavoritesResponse> UpdateFavoritesAsync(
+        Guid userId, UpdateFavoritesRequest request, CancellationToken ct = default)
+    {
+        if (await userRepo.GetByIdAsync(userId, ct) is null)
+            throw new DomainException("USER_NOT_FOUND", "User not found.", 404);
+
+        if (request.DebrisIds is not null)
+            await favoritesRepo.ReplaceDebrisAsync(userId, request.DebrisIds, ct);
+
+        if (request.Windows is not null)
+        {
+            var windowEntities = request.Windows.Take(200).Select(w => new UserSavedWindowEntity
+            {
+                UserId      = userId,
+                WindowId    = w.TryGetProperty("id",          out var idP)   ? idP.GetString()   ?? Guid.NewGuid().ToString() : Guid.NewGuid().ToString(),
+                Destination = w.TryGetProperty("destination", out var destP) ? destP.GetString() ?? ""                        : "",
+                Label       = w.TryGetProperty("label",       out var lblP)  ? lblP.GetString()  : null,
+                SavedAt     = w.TryGetProperty("saved_at",    out var saP) && DateTime.TryParse(saP.GetString(), out var sa)
+                                  ? sa.ToUniversalTime() : DateTime.UtcNow,
+                WindowJson  = w.ToString(),
+            });
+            await favoritesRepo.ReplaceWindowsAsync(userId, windowEntities, ct);
+        }
+
+        await favoritesRepo.SaveChangesAsync(ct);
+
+        var debris      = await favoritesRepo.GetDebrisAsync(userId, ct);
+        var savedWindows = await favoritesRepo.GetWindowsAsync(userId, ct);
+        return BuildFavoritesResponse(debris, savedWindows);
+    }
+
+    private static FavoritesResponse BuildFavoritesResponse(
+        IReadOnlyList<UserFavoriteDebrisEntity> debris,
+        IReadOnlyList<UserSavedWindowEntity> windows)
+    {
+        var debrisIds = debris.Select(d => d.DebrisId).ToArray();
+
+        var windowObjects = windows
+            .Select(w =>
+            {
+                try { return JsonSerializer.Deserialize<object>(w.WindowJson) ?? new { }; }
+                catch { return (object)new { }; }
+            })
+            .ToArray();
+
+        var updatedAt = debris.Count > 0 || windows.Count > 0
+            ? debris.Select(d => d.SavedAt).Concat(windows.Select(w => w.SavedAt)).Max()
+            : DateTime.UtcNow;
+
+        return new FavoritesResponse(debrisIds, windowObjects, updatedAt.ToString("O"));
     }
 
     private async Task<UserProfileResponse> BuildProfileAsync(UserEntity user, CancellationToken ct)
