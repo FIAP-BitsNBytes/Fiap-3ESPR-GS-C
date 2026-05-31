@@ -146,7 +146,9 @@ public sealed class AuthServiceTests
     // ── RefreshAsync ─────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task RefreshAsync_ReturnsNewAccessToken_WhenTokenValid()
+    // No rotation: refresh_token is NOT revoked on refresh.
+    // Mobile reuses the same token until it expires (TTL 7d).
+    public async Task RefreshAsync_ReturnsNewAccessToken_NoRotation()
     {
         var userId = Guid.NewGuid();
         var existingToken = new RefreshTokenEntity
@@ -164,14 +166,13 @@ public sealed class AuthServiceTests
                 Id = userId, Email = "u@test.com",
                 DisplayName = "U", PasswordHash = "h", Role = "Researcher"
             });
-        _tokenRepo.Setup(r => r.AddAsync(It.IsAny<RefreshTokenEntity>(), default))
-            .Returns(Task.CompletedTask);
-        _tokenRepo.Setup(r => r.SaveChangesAsync(default)).Returns(Task.CompletedTask);
 
         var result = await _service.RefreshAsync(new RefreshRequest("valid-token"), default);
 
         result.AccessToken.Should().Be("access-token");
-        _tokenRepo.Verify(r => r.RevokeByTokenAsync("valid-token", default));
+        // CRITICAL: token must NOT be revoked — mobile reuses the same refresh_token
+        _tokenRepo.Verify(r => r.RevokeByTokenAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _tokenRepo.Verify(r => r.AddAsync(It.IsAny<RefreshTokenEntity>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     [Fact]

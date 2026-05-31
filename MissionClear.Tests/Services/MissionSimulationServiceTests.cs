@@ -21,7 +21,6 @@ public sealed class MissionSimulationServiceTests
 
         return new MissionSimulationService(
             new ConjunctionDetector(),
-            new LaunchWindowCalculator(),
             cache,
             store,
             history);
