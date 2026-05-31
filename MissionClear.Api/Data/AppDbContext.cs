@@ -9,6 +9,8 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
     public DbSet<RefreshTokenEntity> RefreshTokens => Set<RefreshTokenEntity>();
     public DbSet<MissionEntity> Missions => Set<MissionEntity>();
     public DbSet<OrbitalObjectEntity> OrbitalObjects => Set<OrbitalObjectEntity>();
+    public DbSet<UserFavoriteDebrisEntity> FavoriteDebris => Set<UserFavoriteDebrisEntity>();
+    public DbSet<UserSavedWindowEntity> SavedWindows => Set<UserSavedWindowEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -37,10 +39,34 @@ public sealed class AppDbContext(DbContextOptions<AppDbContext> options) : DbCon
             .WithMany(u => u.RefreshTokens)
             .HasForeignKey(rt => rt.UserId)
             .OnDelete(DeleteBehavior.Cascade);
-            
+
         // Index p/ busca rápida de tokens
         modelBuilder.Entity<RefreshTokenEntity>()
             .HasIndex(rt => rt.Token);
+
+        // FavoriteDebris Cascade Delete
+        modelBuilder.Entity<UserFavoriteDebrisEntity>()
+            .HasOne(f => f.User)
+            .WithMany(u => u.FavoriteDebris)
+            .HasForeignKey(f => f.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Unique: one entry per user+debris_id pair
+        modelBuilder.Entity<UserFavoriteDebrisEntity>()
+            .HasIndex(f => new { f.UserId, f.DebrisId })
+            .IsUnique();
+
+        // SavedWindows Cascade Delete
+        modelBuilder.Entity<UserSavedWindowEntity>()
+            .HasOne(w => w.User)
+            .WithMany(u => u.SavedWindows)
+            .HasForeignKey(w => w.UserId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        // Unique: one entry per user+window_id pair
+        modelBuilder.Entity<UserSavedWindowEntity>()
+            .HasIndex(w => new { w.UserId, w.WindowId })
+            .IsUnique();
     }
 
     private static List<OrbitalObjectEntity> GenerateSeedData()
