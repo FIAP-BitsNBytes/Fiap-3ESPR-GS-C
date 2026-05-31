@@ -36,7 +36,7 @@ public sealed class OrbitalCache : IOrbitalCache
     public OrbitalObject? GetById(string id) =>
         _index.TryGetValue(id, out var obj) ? obj : null;
 
-    public void Update(IReadOnlyList<OrbitalObject> objects)
+    public void Update(IReadOnlyList<OrbitalObject> objects, bool isFetch = false)
     {
         ArgumentNullException.ThrowIfNull(objects);
 
@@ -54,9 +54,11 @@ public sealed class OrbitalCache : IOrbitalCache
 
                 if (merged.TryGetValue(obj.Id, out var existing))
                 {
-                    // Only replace if incoming is CelesTrak and existing is not.
-                    if (string.Equals(obj.Source, "celestrak", StringComparison.OrdinalIgnoreCase)
-                        && !string.Equals(existing.Source, "celestrak", StringComparison.OrdinalIgnoreCase))
+                    // CelesTrak sources use "celestrak" or "celestrak-{label}" (e.g. "celestrak-stations").
+                    // KeepTrack uses "keeptrack". CelesTrak always wins.
+                    var incomingIsCelesTrak = obj.Source.StartsWith("celestrak", StringComparison.OrdinalIgnoreCase);
+                    var existingIsCelesTrak = existing.Source.StartsWith("celestrak", StringComparison.OrdinalIgnoreCase);
+                    if (incomingIsCelesTrak && !existingIsCelesTrak)
                     {
                         merged[obj.Id] = obj;
                     }
@@ -77,9 +79,7 @@ public sealed class OrbitalCache : IOrbitalCache
 
             _snapshot = filtered.AsReadOnly();
 
-            // Timestamp semantics: TleLine1 present → this was a fetch; absent → propagation.
-            bool hasTleLines = objects.Any(o => o.TleLine1 is not null);
-            if (hasTleLines)
+            if (isFetch)
                 LastFetch = now;
             else
                 LastPropagation = now;

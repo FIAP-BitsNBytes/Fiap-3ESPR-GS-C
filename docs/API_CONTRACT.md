@@ -1906,3 +1906,4 @@ const claims = jwtDecode<AccessClaims>(accessToken);
 | 2026-05-28 | 2.2.0 | Formato `id:` do protocolo SSE documentado; token rotation explicitado (sem rotation, refresh_token permanece); mocks adicionados para /simulate, /users/me, /missions/{id}, /dashboard/summary (anônimo+auth), /dashboard/alerts, /session/complete — auditoria mobile score 91/100, zero bloqueantes |
 | 2026-05-30 | 2.3.0 | Rotas de favoritos documentadas: `GET /api/users/me/favorites` e `PUT /api/users/me/favorites` — replace atômico de debris_ids e windows com patch parcial por null |
 | 2026-05-30 | 2.4.0 | `POST /api/admin/refresh` — forçar atualização de TLEs sem restart; requer role Administrator; nova §13 Admin; seções §14–§25 renumeradas |
+| 2026-05-30 | 2.4.1 | Catálogos CelesTrak expandidos (5→8): active, cosmos-1408-debris, breeze-m-debris — ~18k objetos esperados |
