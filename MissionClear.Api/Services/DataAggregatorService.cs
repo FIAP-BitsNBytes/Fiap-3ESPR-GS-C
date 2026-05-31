@@ -78,7 +78,7 @@ public sealed class DataAggregatorService : IDataAggregatorService
 
                 anySucceeded = true;
             }
-            catch (OperationCanceledException) { throw; }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested) { throw; }
             catch (Exception ex)
             {
                 _logger.LogWarning(ex,
@@ -105,7 +105,7 @@ public sealed class DataAggregatorService : IDataAggregatorService
         }
 
         var result = allObjects.Values.ToList().AsReadOnly();
-        _cache.Update(result);
+        _cache.Update(result, isFetch: true);
         _capturedUpdates?.Add(result);
 
         _logger.LogInformation(
@@ -208,18 +208,26 @@ public sealed class DataAggregatorService : IDataAggregatorService
                 ? $"OBJECT-{noradId}"
                 : name.Trim();
 
+            var orbit = ParseTleOrbitParams(tle1, tle2);
+
             objects.Add(new OrbitalObject(
-                Id:          noradId,
-                Name:        displayName,
-                Type:        ClassifyType(displayName, string.Empty),
-                Latitude:    0.0,
-                Longitude:   0.0,
-                AltitudeKm:  400.0,
-                VelocityKmS: 7.5,
-                Source:      source,
-                UpdatedAt:   now,
-                TleLine1:    tle1,
-                TleLine2:    tle2));
+                Id:             noradId,
+                Name:           displayName,
+                Type:           ClassifyType(displayName, string.Empty),
+                Latitude:       0.0,
+                Longitude:      0.0,
+                AltitudeKm:     orbit.MeanAltitudeKm,
+                VelocityKmS:    orbit.VelocityKmS,
+                Source:         source,
+                UpdatedAt:      now,
+                TleLine1:       tle1,
+                TleLine2:       tle2,
+                TleEpoch:       orbit.Epoch,
+                InclinationDeg: orbit.InclinationDeg,
+                Eccentricity:   orbit.Eccentricity,
+                PeriodMinutes:  orbit.PeriodMinutes,
+                ApogeeKm:       orbit.ApogeeKm,
+                PerigeeKm:      orbit.PerigeeKm));
         }
 
         return objects;
@@ -271,6 +279,71 @@ public sealed class DataAggregatorService : IDataAggregatorService
             _logger.LogWarning(ex, "KeepTrack fetch failed — continuing without it");
             return [];
         }
+    }
+
+    // ── TLE orbital parameter parser ──────────────────────────────────────────
+
+    private sealed record TleOrbitParams(
+        string Epoch,
+        double InclinationDeg,
+        double Eccentricity,
+        double PeriodMinutes,
+        double ApogeeKm,
+        double PerigeeKm,
+        double MeanAltitudeKm,
+        double VelocityKmS);
+
+    private static TleOrbitParams ParseTleOrbitParams(string tle1, string tle2)
+    {
+        const double Mu    = 398600.4418; // km³/s²
+        const double Re    = 6371.0;      // km
+        const double TwoPi = 2.0 * Math.PI;
+
+        var epoch = tle1.Length >= 32 ? tle1[18..32].Trim() : string.Empty;
+
+        double inclDeg = 0, ecc = 0, meanMotionRevDay = 0;
+
+        if (tle2.Length >= 16)
+            double.TryParse(
+                tle2[8..16].Trim(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out inclDeg);
+
+        if (tle2.Length >= 33)
+        {
+            var eccStr = "0." + tle2[26..33].Trim();
+            double.TryParse(
+                eccStr,
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out ecc);
+        }
+
+        if (tle2.Length >= 63)
+            double.TryParse(
+                tle2[52..63].Trim(),
+                System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture,
+                out meanMotionRevDay);
+
+        if (meanMotionRevDay <= 0)
+            return new TleOrbitParams(epoch, inclDeg, ecc, 0, 0, 0, 400.0, 7.5);
+
+        var periodMin = 1440.0 / meanMotionRevDay;
+        var nRadS     = meanMotionRevDay * TwoPi / 86400.0;
+        var a         = Math.Pow(Mu / (nRadS * nRadS), 1.0 / 3.0);
+        var apogeeKm  = a * (1.0 + ecc) - Re;
+        var perigeeKm = a * (1.0 - ecc) - Re;
+        var meanAlt   = Math.Clamp((apogeeKm + perigeeKm) / 2.0, 200.0, 2000.0);
+        var velocity  = Math.Sqrt(Mu / a);
+
+        return new TleOrbitParams(
+            epoch, inclDeg, ecc, periodMin,
+            Math.Round(apogeeKm,  2),
+            Math.Round(perigeeKm, 2),
+            Math.Round(meanAlt,   2),
+            Math.Round(velocity,  4));
     }
 
     // ── helpers ───────────────────────────────────────────────────────────────
