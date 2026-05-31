@@ -33,4 +33,6 @@ public sealed class UserEntity
 
     public ICollection<RefreshTokenEntity> RefreshTokens { get; set; } = [];
     public ICollection<MissionEntity> Missions { get; set; } = [];
+    public ICollection<UserFavoriteDebrisEntity> FavoriteDebris { get; set; } = [];
+    public ICollection<UserSavedWindowEntity> SavedWindows { get; set; } = [];
 }
