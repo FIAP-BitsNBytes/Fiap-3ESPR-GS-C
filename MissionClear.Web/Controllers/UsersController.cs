@@ -5,7 +5,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace MissionClear.Web.Controllers;
 
 [Authorize(Roles = "Administrator")]
-public sealed class UsersController(ApiClient apiClient) : Controller
+public sealed class UsersController : Controller
 {
     [HttpGet]
     public IActionResult Index()

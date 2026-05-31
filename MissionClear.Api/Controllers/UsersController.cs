@@ -25,4 +25,22 @@ public sealed class UsersController(IUserService userService) : BaseApiControlle
         var profile = await userService.UpdateProfileAsync(CurrentUserId, request, ct);
         return Ok(profile);
     }
+
+    // GET api/users/me/favorites
+    [HttpGet("me/favorites")]
+    public async Task<IActionResult> GetFavorites(CancellationToken ct)
+    {
+        var favorites = await userService.GetFavoritesAsync(CurrentUserId, ct);
+        return Ok(favorites);
+    }
+
+    // PUT api/users/me/favorites
+    [HttpPut("me/favorites")]
+    public async Task<IActionResult> UpdateFavorites(
+        [FromBody] UpdateFavoritesRequest request,
+        CancellationToken ct)
+    {
+        var favorites = await userService.UpdateFavoritesAsync(CurrentUserId, request, ct);
+        return Ok(favorites);
+    }
 }
