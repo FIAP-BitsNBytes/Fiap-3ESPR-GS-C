@@ -34,6 +34,14 @@
 15. [Códigos de Erro](#15-códigos-de-erro)
 16. [Referência de Campos](#16-referência-de-campos)
 17. [Mocks para Mobile](#17-mocks-para-mobile)
+18. [Mobile — Variáveis de Ambiente](#18-mobile--variáveis-de-ambiente)
+19. [Mobile — Interceptor de Request](#19-mobile--interceptor-de-request)
+20. [Mobile — Interceptor de Response](#20-mobile--interceptor-de-response)
+21. [Mobile — Fluxo de Autenticação Completo](#21-mobile--fluxo-de-autenticação-completo)
+22. [Mobile — Fluxo Anônimo vs Autenticado](#22-mobile--fluxo-anônimo-vs-autenticado)
+23. [Mobile — SSE (Server-Sent Events)](#23-mobile--sse-server-sent-events)
+24. [Mobile — Identificação do Usuário](#24-mobile--identificação-do-usuário)
+25. [Mobile — Regras de Negócio](#25-mobile--regras-de-negócio)
 
 ---
 
@@ -492,7 +500,7 @@ Estatísticas agregadas da população de detritos.
 **Response — 200 OK:**
 ```json
 {
-  "total_tracked": 21432,
+  "total_tracked": 18432,
   "by_type": {
     "debris": 15234,
     "satellite": 4823,
@@ -504,7 +512,7 @@ Estatísticas agregadas da população de detritos.
     "high_1000_2000km": 6075
   },
   "sources": {
-    "celestrak": 21432,
+    "celestrak": 18432,
     "keeptrack": 0
   },
   "last_updated": "2025-05-27T14:32:00Z"
@@ -927,7 +935,7 @@ Visão geral orbital. Com token retorna dados do usuário junto.
 ```json
 {
   "orbital": {
-    "total_tracked_objects": 21432,
+    "total_tracked_objects": 18432,
     "by_type": {
       "debris": 15234,
       "satellite": 4823,
@@ -949,7 +957,7 @@ Visão geral orbital. Com token retorna dados do usuário junto.
 ```json
 {
   "orbital": {
-    "total_tracked_objects": 21432,
+    "total_tracked_objects": 18432,
     "by_type": {
       "debris": 15234,
       "satellite": 4823,
@@ -1034,8 +1042,8 @@ Estado da API. Mobile deve verificar antes de iniciar qualquer request orbital.
 ```json
 {
   "status": "ready",
-  "tle_count": 21432,
-  "propagated_count": 18901,
+  "tle_count": 18432,
+  "propagated_count": 16800,
   "last_tle_fetch": "2025-05-27T14:00:00Z",
   "last_propagation": "2025-05-27T14:32:00Z",
   "uptime_seconds": 3720,
@@ -1338,7 +1346,7 @@ O Mobile pode desenvolver com estes JSONs estáticos antes do backend estar pron
 
 ### /api/status
 ```json
-{"status":"ready","tle_count":21432,"propagated_count":18901,"last_tle_fetch":"2025-05-27T14:00:00Z","last_propagation":"2025-05-27T14:32:00Z","uptime_seconds":3720,"sources":{"celestrak":"ok","keeptrack":"unavailable"}}
+{"status":"ready","tle_count":18432,"propagated_count":16800,"last_tle_fetch":"2025-05-27T14:00:00Z","last_propagation":"2025-05-27T14:32:00Z","uptime_seconds":3720,"sources":{"celestrak":"ok","keeptrack":"unavailable"}}
 ```
 
 ### /api/destinations
@@ -1353,7 +1361,7 @@ O Mobile pode desenvolver com estes JSONs estáticos antes do backend estar pron
 
 ### /api/debris/stats
 ```json
-{"total_tracked":21432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"sources":{"celestrak":21432,"keeptrack":0},"last_updated":"2025-05-27T14:32:00Z"}
+{"total_tracked":18432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"sources":{"celestrak":18432,"keeptrack":0},"last_updated":"2025-05-27T14:32:00Z"}
 ```
 
 ### /api/launch-windows/best
@@ -1403,12 +1411,12 @@ data: {"status":"success","mission_score":87,"risk_score":0.1240,"delta_v_km_s":
 
 ### GET /api/dashboard/summary (sem auth)
 ```json
-{"orbital":{"total_tracked_objects":21432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"active_conjunction_alerts":3,"last_updated":"2025-05-27T14:32:00Z"},"user":null}
+{"orbital":{"total_tracked_objects":18432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"active_conjunction_alerts":3,"last_updated":"2025-05-27T14:32:00Z"},"user":null}
 ```
 
 ### GET /api/dashboard/summary (com auth)
 ```json
-{"orbital":{"total_tracked_objects":21432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"active_conjunction_alerts":3,"last_updated":"2025-05-27T14:32:00Z"},"user":{"display_name":"Piloto Guss","total_missions":12,"best_score":97,"last_mission":{"destination":"ISS","status":"success","score":87,"created_at":"2025-05-27T14:32:00Z"}}}
+{"orbital":{"total_tracked_objects":18432,"by_type":{"debris":15234,"satellite":4823,"rocket_body":1375},"by_altitude_band":{"low_200_500km":8234,"mid_500_1000km":7123,"high_1000_2000km":6075},"active_conjunction_alerts":3,"last_updated":"2025-05-27T14:32:00Z"},"user":{"display_name":"Piloto Guss","total_missions":12,"best_score":97,"last_mission":{"destination":"ISS","status":"success","score":87,"created_at":"2025-05-27T14:32:00Z"}}}
 ```
 
 ### GET /api/dashboard/alerts (response)
