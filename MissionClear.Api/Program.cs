@@ -1,6 +1,7 @@
 using MissionClear.Api.Configuration;
 using MissionClear.Api.Data;
 using MissionClear.Api.Data.Repositories;
+using MissionClear.Api.Dtos.Common;
 using MissionClear.Api.Middleware;
 using MissionClear.Api.Services;
 using MissionClear.Api.Services.Background;
@@ -61,6 +62,11 @@ builder.Services.AddCors(options =>
 });
 
 // ── JWT Bearer Authentication ─────────────────────────────────────────────────
+var jwtErrorOptions = new JsonSerializerOptions
+{
+    PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+};
+
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
     {
@@ -78,6 +84,32 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidAudience            = jwtSettings.Audience,
             IssuerSigningKey         = new SymmetricSecurityKey(
                                            Encoding.UTF8.GetBytes(jwtSettings.Secret)),
+        };
+
+        // Return structured JSON errors so the mobile interceptor can read error codes.
+        // Without this, ASP.NET returns 401/403 with empty bodies — mobile never sees TOKEN_EXPIRED.
+        options.Events = new Microsoft.AspNetCore.Authentication.JwtBearer.JwtBearerEvents
+        {
+            OnChallenge = async context =>
+            {
+                context.HandleResponse(); // suppress default WWW-Authenticate challenge
+                context.Response.StatusCode  = 401;
+                context.Response.ContentType = "application/json";
+                var isExpired = context.AuthenticateFailure
+                    is Microsoft.IdentityModel.Tokens.SecurityTokenExpiredException;
+                var dto = isExpired
+                    ? ApiErrorDto.TokenExpired()
+                    : ApiErrorDto.Unauthorized();
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(dto, jwtErrorOptions));
+            },
+            OnForbidden = async context =>
+            {
+                context.Response.StatusCode  = 403;
+                context.Response.ContentType = "application/json";
+                await context.Response.WriteAsync(
+                    JsonSerializer.Serialize(ApiErrorDto.Forbidden(), jwtErrorOptions));
+            },
         };
     });
 
@@ -115,6 +147,7 @@ builder.Services.AddHttpClient("keeptrack", client =>
 builder.Services.AddScoped<IUserRepository,         UserRepository>();
 builder.Services.AddScoped<IRefreshTokenRepository, RefreshTokenRepository>();
 builder.Services.AddScoped<IMissionRepository,      MissionRepository>();
+builder.Services.AddScoped<IFavoritesRepository,    FavoritesRepository>();
 
 // ── Services ──────────────────────────────────────────────────────────────────
 builder.Services.AddSingleton<IOrbitalCache,                OrbitalCache>();

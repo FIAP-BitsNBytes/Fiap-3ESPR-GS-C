@@ -26,6 +26,8 @@ public interface IOrbitalCache
     /// Replaces the cache contents after applying LEO filter (200–2000 km)
     /// and age filter (UpdatedAt within last 7 days).
     /// During merge, CelesTrak source wins on Id conflict.
+    /// Pass <paramref name="isFetch"/> = true when called from TLE ingestion,
+    /// false when called from propagation — controls LastFetch/LastPropagation timestamps.
     /// </summary>
-    void Update(IReadOnlyList<OrbitalObject> objects);
+    void Update(IReadOnlyList<OrbitalObject> objects, bool isFetch = false);
 }

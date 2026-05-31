@@ -8,7 +8,6 @@ namespace MissionClear.Api.Services;
 
 public sealed class MissionSimulationService(
     IConjunctionDetector detector,
-    ILaunchWindowCalculator calculator,
     IOrbitalCache cache,
     ISessionStore sessions,
     IMissionHistoryService history) : IMissionSimulationService
