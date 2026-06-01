@@ -13,4 +13,6 @@ public interface IDashboardService
         int windowHours,
         string minRisk,
         CancellationToken ct = default);
+
+    OrbitalDetailDto GetOrbitalDetail();
 }

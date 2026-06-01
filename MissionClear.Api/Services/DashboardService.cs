@@ -69,6 +69,48 @@ public sealed class DashboardService(
         return new DashboardSummaryResponse(orbital, userDto);
     }
 
+    public OrbitalDetailDto GetOrbitalDetail()
+    {
+        var objects = cache.GetAll();
+
+        // By source — ordered by count desc
+        var bySource = objects
+            .GroupBy(o => o.Source)
+            .Select(g => new SourceCountDto(g.Key, g.Count()))
+            .OrderByDescending(s => s.Count)
+            .ToList()
+            .AsReadOnly();
+
+        // Inclination bins — 10° intervals 0..100
+        var inclinationBins = new List<InclinationBinDto>();
+        for (int i = 0; i < 10; i++)
+        {
+            double minDeg = i * 10.0, maxDeg = (i + 1) * 10.0;
+            int count = objects.Count(o =>
+                o.InclinationDeg.HasValue &&
+                o.InclinationDeg.Value >= minDeg &&
+                o.InclinationDeg.Value < maxDeg);
+            inclinationBins.Add(new InclinationBinDto($"{(int)minDeg}-{(int)maxDeg}°", minDeg, maxDeg, count));
+        }
+
+        // Inclination × Altitude heatmap grid
+        static string AltBand(double alt) => alt < 500 ? "low_200_500" : alt < 1000 ? "mid_500_1000" : "high_1000_2000";
+        var grid = objects
+            .Where(o => o.InclinationDeg.HasValue)
+            .GroupBy(o => (
+                Inclination: $"{(int)(Math.Floor(o.InclinationDeg!.Value / 10.0) * 10)}-{(int)(Math.Floor(o.InclinationDeg.Value / 10.0) * 10 + 10)}°",
+                Altitude: AltBand(o.AltitudeKm)))
+            .Select(g => new InclinationAltitudeCellDto(g.Key.Inclination, g.Key.Altitude, g.Count()))
+            .OrderBy(c => c.InclinationBand)
+            .ThenBy(c => c.AltitudeBand)
+            .ToList()
+            .AsReadOnly();
+
+        int withTle = objects.Count(o => o.TleLine1 != null);
+
+        return new OrbitalDetailDto(bySource, inclinationBins.AsReadOnly(), grid, withTle, objects.Count - withTle);
+    }
+
     public Task<AlertsResponse> GetAlertsAsync(
         int windowHours,
         string minRisk,

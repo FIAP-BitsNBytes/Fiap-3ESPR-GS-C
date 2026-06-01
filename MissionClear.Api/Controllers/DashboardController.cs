@@ -30,6 +30,14 @@ public sealed class DashboardController(
         return Ok(result);
     }
 
+    // GET api/dashboard/orbital-detail — public
+    [HttpGet("orbital-detail")]
+    public IActionResult GetOrbitalDetail()
+    {
+        var result = dashboardService.GetOrbitalDetail();
+        return Ok(result);
+    }
+
     // GET api/dashboard/alerts — public
     [HttpGet("alerts")]
     public async Task<IActionResult> GetAlerts(
