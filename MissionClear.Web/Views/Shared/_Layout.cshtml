@@ -4,56 +4,71 @@
     <meta charset="utf-8" />
     <title>Mission Clear — @ViewData["Title"]</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <style>
-        body { font-family: sans-serif; margin: 0; background: #0a0a1a; color: #e0e0ff; }
-        nav { background: #111133; padding: 1rem 2rem; display: flex; gap: 1.5rem; align-items: center; }
-        nav a { color: #88aaff; text-decoration: none; }
-        nav a:hover { color: #fff; }
-        .main { padding: 2rem; max-width: 1200px; margin: 0 auto; }
-        .card { background: #111133; border-radius: 8px; padding: 1.5rem; margin-bottom: 1rem; }
-        .btn { padding: .5rem 1.5rem; border-radius: 4px; border: none; cursor: pointer; }
-        .btn-primary { background: #4466ff; color: white; }
-        .btn-danger { background: #cc3333; color: white; }
-        input, select { padding: .5rem; border-radius: 4px; border: 1px solid #334; background: #0a0a1a; color: #e0e0ff; width: 100%; margin-bottom: .75rem; }
-        label { display: block; margin-bottom: .25rem; font-size: .9rem; color: #aaa; }
-        .error { color: #ff6666; margin-bottom: 1rem; }
-        .badge { padding: .2rem .6rem; border-radius: 99px; font-size: .75rem; }
-        .badge-success { background: #1a4433; color: #44ff88; }
-        .badge-failure { background: #441a1a; color: #ff6666; }
+        :root { --bs-body-bg: #0a0a1a; --bs-body-color: #e0e0ff; }
+        body { background: #0a0a1a; color: #e0e0ff; }
+        .navbar { background: #111133 !important; border-bottom: 1px solid #1a1a44; }
+        .navbar-brand { color: #fff !important; font-weight: 700; }
+        .nav-link { color: #88aaff !important; }
+        .nav-link:hover { color: #fff !important; }
+        .card-dark { background: #111133; border: 1px solid #1a1a44; border-radius: 10px; }
+        .kpi-value { font-size: 2rem; font-weight: 700; }
+        .kpi-label { font-size: .8rem; color: #888; text-transform: uppercase; letter-spacing: .05em; }
+        .chart-title { font-size: .9rem; color: #aaa; margin-bottom: 1rem; text-transform: uppercase; letter-spacing: .05em; }
         .badge-admin { background: #441111; color: #ff4444; }
-        .stat { display: inline-block; margin-right: 2rem; }
-        .stat-value { font-size: 2rem; font-weight: bold; color: #88aaff; }
-        .stat-label { font-size: .8rem; color: #888; }
+        input, select { background: #0a0a1a !important; color: #e0e0ff !important; border-color: #334 !important; }
+        .error { color: #ff6666; }
+        .btn-primary { background: #4466ff; border-color: #4466ff; }
+        .btn-danger { background: #cc3333; border-color: #cc3333; }
+        .table { color: #e0e0ff; }
+        .table-dark-custom { --bs-table-bg: #111133; --bs-table-striped-bg: #0f0f2a; --bs-table-hover-bg: #1a1a44; --bs-table-color: #e0e0ff; --bs-table-border-color: #1a1a44; }
     </style>
 </head>
 <body>
-    <nav>
-        <strong style="color:#fff;font-size:1.2rem">🚀 Mission Clear</strong>
-        <a asp-controller="Dashboard" asp-action="Index">Dashboard</a>
-        @if (User.Identity?.IsAuthenticated == true)
-        {
-            <a asp-controller="Missions" asp-action="Index">Missões</a>
-        }
-        @if (User.IsInRole("Administrator"))
-        {
-            <a asp-controller="Users" asp-action="Index">Usuários</a>
-        }
-        <span style="flex:1"></span>
-        @if (User.Identity?.IsAuthenticated == true)
-        {
-            <span style="color:#aaa;font-size:.9rem">@User.Identity.Name</span>
-            <form asp-controller="Auth" asp-action="Logout" method="post" style="display:inline">
-                <button type="submit" class="btn btn-danger" style="padding:.3rem 1rem;font-size:.85rem">Sair</button>
-            </form>
-        }
-        else
-        {
-            <a asp-controller="Auth" asp-action="Login">Entrar</a>
-            <a asp-controller="Auth" asp-action="Register">Registrar</a>
-        }
+    <nav class="navbar navbar-expand-lg navbar-dark mb-4">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">🚀 Mission Clear</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navMenu">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navMenu">
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item"><a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="Missions" asp-action="Index">Missões</a></li>
+                    }
+                    @if (User.IsInRole("Administrator"))
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="Users" asp-action="Index">Usuários</a></li>
+                    }
+                </ul>
+                <ul class="navbar-nav">
+                    @if (User.Identity?.IsAuthenticated == true)
+                    {
+                        <li class="nav-item"><span class="nav-link text-secondary">@User.Identity.Name</span></li>
+                        <li class="nav-item">
+                            <form asp-controller="Auth" asp-action="Logout" method="post">
+                                <button type="submit" class="btn btn-sm btn-danger ms-2">Sair</button>
+                            </form>
+                        </li>
+                    }
+                    else
+                    {
+                        <li class="nav-item"><a class="nav-link" asp-controller="Auth" asp-action="Login">Entrar</a></li>
+                        <li class="nav-item"><a class="nav-link" asp-controller="Auth" asp-action="Register">Registrar</a></li>
+                    }
+                </ul>
+            </div>
+        </div>
     </nav>
-    <div class="main">
+    <div class="container-fluid px-4">
         @RenderBody()
     </div>
+    <script src="~/lib/jquery/dist/jquery.min.js"></script>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/apexcharts@3.49.0/dist/apexcharts.min.js"></script>
+    @await RenderSectionAsync("Scripts", required: false)
 </body>
 </html>

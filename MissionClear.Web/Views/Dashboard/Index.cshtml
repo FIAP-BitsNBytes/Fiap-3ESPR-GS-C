@@ -1,60 +1,274 @@
 @model DashboardViewModel
-@{ ViewData["Title"] = "Dashboard"; }
+@using System.Text.Json
+@{
+    ViewData["Title"] = "Dashboard Orbital";
 
-<h1>Dashboard Orbital</h1>
+    var byTypeSeries = new[] { Model.Debris, Model.Satellites, Model.RocketBodies };
+    var altSeries    = new[] { Model.LowAlt, Model.MidAlt, Model.HighAlt };
 
-<div class="card">
-    <h3>Detritos Rastreados</h3>
-    <div>
-        <span class="stat">
-            <span class="stat-value">@Model.TotalTrackedObjects.ToString("N0")</span>
-            <br/><span class="stat-label">Total</span>
-        </span>
-        <span class="stat">
-            <span class="stat-value" style="color:#ff8888">@Model.Debris.ToString("N0")</span>
-            <br/><span class="stat-label">Detritos</span>
-        </span>
-        <span class="stat">
-            <span class="stat-value" style="color:#88ff88">@Model.Satellites.ToString("N0")</span>
-            <br/><span class="stat-label">Satélites</span>
-        </span>
-        <span class="stat">
-            <span class="stat-value" style="color:#ffaa88">@Model.RocketBodies.ToString("N0")</span>
-            <br/><span class="stat-label">Estágios de Foguete</span>
-        </span>
-        <span class="stat">
-            <span class="stat-value" style="color:@(Model.ActiveAlerts > 0 ? "#ff4444" : "#44ff88")">@Model.ActiveAlerts</span>
-            <br/><span class="stat-label">Alertas Ativos</span>
-        </span>
-    </div>
+    var srcLabels = Model.BySource.Take(8).Select(s => s.Source.Replace("celestrak-", "")).ToArray();
+    var srcCounts = Model.BySource.Take(8).Select(s => s.Count).ToArray();
+
+    var incLabels = Model.InclinationBins.Select(b => b.Band).ToArray();
+    var incCounts = Model.InclinationBins.Select(b => b.Count).ToArray();
+
+    var incBandLabels = Model.InclinationBins.Select(b => b.Band).ToArray();
+
+    double tlePct = Model.TotalTrackedObjects > 0
+        ? Math.Round((double)Model.TotalWithTle / Model.TotalTrackedObjects * 100, 1)
+        : 0;
+
+    var gridCells = Model.InclinationGrid
+        .Select(c => new { inclination_band = c.InclinationBand, altitude_band = c.AltitudeBand, count = c.Count })
+        .ToArray();
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="m-0" style="color:#88aaff">🛰️ Dashboard Orbital</h4>
     @if (!string.IsNullOrEmpty(Model.LastUpdated))
     {
-        <p style="color:#666;font-size:.8rem;margin-top:1rem">Última atualização: @Model.LastUpdated</p>
+        <small class="text-secondary">Atualizado: @Model.LastUpdated</small>
     }
 </div>
 
-@if (!string.IsNullOrEmpty(Model.UserDisplayName))
-{
-    <div class="card">
-        <h3>Suas Estatísticas — @Model.UserDisplayName</h3>
-        <div>
-            <span class="stat">
-                <span class="stat-value">@Model.UserTotalMissions</span>
-                <br/><span class="stat-label">Missões</span>
-            </span>
-            <span class="stat">
-                <span class="stat-value" style="color:#ffd700">@Model.UserBestScore</span>
-                <br/><span class="stat-label">Melhor Score</span>
-            </span>
+<!-- KPI Row -->
+<div class="row g-3 mb-4">
+    @{
+        var kpis = new[]
+        {
+            ("Total Rastreados",        Model.TotalTrackedObjects.ToString("N0"), "#88aaff"),
+            ("Detritos",                Model.Debris.ToString("N0"),              "#ff7070"),
+            ("Satélites",               Model.Satellites.ToString("N0"),          "#70ff70"),
+            ("LEO Baixo (200-500km)",   Model.LowAlt.ToString("N0"),             "#ffd700"),
+            ("LEO Médio (500-1000km)",  Model.MidAlt.ToString("N0"),             "#ff9f40"),
+            ("LEO Alto (1000-2000km)",  Model.HighAlt.ToString("N0"),            "#b088ff"),
+        };
+    }
+    @foreach (var (label, value, color) in kpis)
+    {
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="card-dark p-3 h-100">
+                <div class="kpi-value" style="color:@color">@value</div>
+                <div class="kpi-label">@label</div>
+            </div>
+        </div>
+    }
+</div>
+
+<!-- Charts Row 1 -->
+<div class="row g-3 mb-3">
+    <div class="col-md-5">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Distribuição por Tipo</div>
+            <div id="chartType"></div>
         </div>
     </div>
-}
-else
-{
-    <div class="card">
-        <p>
-            <a asp-controller="Auth" asp-action="Login">Faça login</a>
-            para ver suas estatísticas de missão.
-        </p>
+    <div class="col-md-7">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Objetos por Faixa de Altitude</div>
+            <div id="chartAlt"></div>
+        </div>
     </div>
+</div>
+
+<!-- Charts Row 2 -->
+<div class="row g-3 mb-3">
+    <div class="col-md-6">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Objetos por Fonte de Dados</div>
+            <div id="chartSource"></div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Distribuição por Inclinação Orbital</div>
+            <div id="chartInclination"></div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts Row 3 -->
+<div class="row g-3 mb-4">
+    <div class="col-md-8">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Mapa Orbital: Inclinação × Altitude</div>
+            <div id="chartHeatmap"></div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card-dark p-3 h-100">
+            <div class="chart-title">Cobertura TLE</div>
+            <div id="chartTle"></div>
+            @if (!string.IsNullOrEmpty(Model.UserDisplayName))
+            {
+                <hr style="border-color:#1a1a44;margin:1rem 0" />
+                <div class="kpi-label mb-1">@Model.UserDisplayName</div>
+                <div>
+                    <span class="kpi-value" style="color:#ffd700;font-size:1.4rem">@Model.UserTotalMissions</span>
+                    <span class="kpi-label">missões</span>
+                </div>
+                <div>
+                    <span class="kpi-value" style="color:#70ff70;font-size:1.4rem">@Model.UserBestScore</span>
+                    <span class="kpi-label">melhor score</span>
+                </div>
+            }
+            else
+            {
+                <div class="mt-3 text-secondary" style="font-size:.85rem">
+                    <a asp-controller="Auth" asp-action="Login" style="color:#88aaff">Faça login</a> para ver estatísticas de missão.
+                </div>
+            }
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+(function () {
+    'use strict';
+
+    var dark    = { background: 'transparent', foreColor: '#aaa' };
+    var grid    = { borderColor: '#1a1a44' };
+    var tooltip = { theme: 'dark' };
+
+    // 1. Donut — Por Tipo
+    new ApexCharts(document.getElementById('chartType'), {
+        chart:  { type: 'donut', height: 280, background: 'transparent', foreColor: '#aaa' },
+        series: @Html.Raw(JsonSerializer.Serialize(byTypeSeries)),
+        labels: ['Detritos', 'Satélites', 'Estágios de Foguete'],
+        colors: ['#ff7070', '#4488ff', '#ffaa44'],
+        legend: { position: 'bottom', labels: { colors: '#aaa' } },
+        dataLabels: { style: { colors: ['#fff'] } },
+        plotOptions: {
+            pie: {
+                donut: {
+                    labels: {
+                        show: true,
+                        total: {
+                            show: true,
+                            label: 'Total',
+                            color: '#aaa',
+                            formatter: function () { return '@Model.TotalTrackedObjects.ToString("N0")'; }
+                        }
+                    }
+                }
+            }
+        }
+    }).render();
+
+    // 2. Bar — Por Altitude
+    new ApexCharts(document.getElementById('chartAlt'), {
+        chart:  { type: 'bar', height: 280, background: 'transparent', foreColor: '#aaa' },
+        series: [{ name: 'Objetos', data: @Html.Raw(JsonSerializer.Serialize(altSeries)) }],
+        xaxis:  { categories: ['200-500 km', '500-1000 km', '1000-2000 km'], labels: { style: { colors: '#aaa' } } },
+        yaxis:  { labels: { style: { colors: '#aaa' } } },
+        colors: ['#4466ff'],
+        grid:    grid,
+        tooltip: tooltip,
+        plotOptions: { bar: { borderRadius: 4, dataLabels: { position: 'top' } } },
+        dataLabels: {
+            enabled: true,
+            style:   { colors: ['#aaa'] },
+            formatter: function (v) { return v.toLocaleString('pt-BR'); }
+        }
+    }).render();
+
+    // 3. Horizontal Bar — Por Fonte
+    new ApexCharts(document.getElementById('chartSource'), {
+        chart:  { type: 'bar', height: 320, background: 'transparent', foreColor: '#aaa' },
+        series: [{ name: 'Objetos', data: @Html.Raw(JsonSerializer.Serialize(srcCounts)) }],
+        xaxis:  { categories: @Html.Raw(JsonSerializer.Serialize(srcLabels)), labels: { style: { colors: '#aaa' } } },
+        yaxis:  { labels: { style: { colors: '#aaa' } } },
+        colors: ['#44aaff'],
+        grid:    grid,
+        tooltip: tooltip,
+        plotOptions: { bar: { horizontal: true, borderRadius: 4 } },
+        dataLabels: {
+            enabled: true,
+            style:   { colors: ['#fff'] },
+            formatter: function (v) { return v.toLocaleString('pt-BR'); }
+        }
+    }).render();
+
+    // 4. Bar — Inclinação Orbital
+    new ApexCharts(document.getElementById('chartInclination'), {
+        chart:  { type: 'bar', height: 320, background: 'transparent', foreColor: '#aaa' },
+        series: [{ name: 'Objetos', data: @Html.Raw(JsonSerializer.Serialize(incCounts)) }],
+        xaxis:  {
+            categories: @Html.Raw(JsonSerializer.Serialize(incLabels)),
+            labels: { style: { colors: '#aaa' }, rotate: -45 }
+        },
+        yaxis:  { labels: { style: { colors: '#aaa' } } },
+        colors: ['#aa44ff'],
+        grid:    grid,
+        tooltip: tooltip,
+        plotOptions: { bar: { borderRadius: 3 } },
+        dataLabels: { enabled: false }
+    }).render();
+
+    // 5. Heatmap — Inclinação × Altitude
+    (function () {
+        var altBands = ['low_200_500', 'mid_500_1000', 'high_1000_2000'];
+        var altNames = ['200-500km', '500-1000km', '1000-2000km'];
+        var incBands = @Html.Raw(JsonSerializer.Serialize(incBandLabels));
+        var rawGrid  = @Html.Raw(JsonSerializer.Serialize(gridCells));
+
+        var series = altBands.map(function (ab, i) {
+            return {
+                name: altNames[i],
+                data: incBands.map(function (ib) {
+                    var cell = rawGrid.find(function (c) {
+                        return c.inclination_band === ib && c.altitude_band === ab;
+                    });
+                    return { x: ib, y: cell ? cell.count : 0 };
+                })
+            };
+        });
+
+        new ApexCharts(document.getElementById('chartHeatmap'), {
+            chart:       { type: 'heatmap', height: 260, background: 'transparent', foreColor: '#aaa', toolbar: { show: false } },
+            series:      series,
+            dataLabels:  { enabled: false },
+            colors:      ['#4466ff'],
+            xaxis:       { labels: { style: { colors: '#aaa' }, rotate: -45 } },
+            yaxis:       { labels: { style: { colors: '#aaa' } } },
+            grid:         grid,
+            tooltip:      tooltip,
+            plotOptions: {
+                heatmap: {
+                    colorScale: {
+                        ranges: [
+                            { from: 0,    to: 0,     color: '#111133', name: 'Vazio' },
+                            { from: 1,    to: 500,   color: '#1a3366', name: 'Baixo' },
+                            { from: 501,  to: 2000,  color: '#2255aa', name: 'Médio' },
+                            { from: 2001, to: 99999, color: '#4488ff', name: 'Alto'  }
+                        ]
+                    }
+                }
+            }
+        }).render();
+    })();
+
+    // 6. Radial — Cobertura TLE
+    new ApexCharts(document.getElementById('chartTle'), {
+        chart:  { type: 'radialBar', height: 220, background: 'transparent', foreColor: '#aaa' },
+        series: [@tlePct],
+        labels: ['Com TLE'],
+        colors: ['#70ff70'],
+        plotOptions: {
+            radialBar: {
+                dataLabels: {
+                    name:  { color: '#aaa' },
+                    value: {
+                        color:     '#70ff70',
+                        fontSize:  '1.5rem',
+                        formatter: function (v) { return v + '%'; }
+                    }
+                }
+            }
+        }
+    }).render();
+
+})();
+</script>
 }
