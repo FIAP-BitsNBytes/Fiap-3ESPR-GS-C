@@ -1,21 +1,89 @@
 @model LoginViewModel
-@{ ViewData["Title"] = "Login"; }
+@{ ViewData["Title"] = "Entrar"; }
 
-<div class="card" style="max-width:400px;margin:2rem auto">
-    <h2>Entrar</h2>
-    @if (!string.IsNullOrEmpty(Model.Error))
-    {
-        <div class="error">@Model.Error</div>
-    }
-    <form asp-action="Login" method="post">
-        <input asp-for="ReturnUrl" type="hidden" />
-        <label>Email</label>
-        <input asp-for="Email" type="email" placeholder="piloto@missao.com" />
-        <label>Senha</label>
-        <input asp-for="Password" type="password" placeholder="••••••••" />
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.5rem">Entrar</button>
-    </form>
-    <p style="margin-top:1rem;color:#aaa;font-size:.9rem">
-        Não tem conta? <a asp-action="Register">Registrar</a>
-    </p>
+<style>
+    .auth-wrap     { min-height: 75vh; display:flex; align-items:center; justify-content:center; }
+    .auth-card     { width:100%; max-width:420px; background:#111133;
+                     border:1px solid #1a1a44; border-radius:14px; padding:2.5rem 2rem; }
+    .auth-logo     { text-align:center; margin-bottom:2rem; }
+    .auth-logo-icon{ font-size:2.4rem; display:block; margin-bottom:.4rem; }
+    .auth-title    { font-size:1.2rem; font-weight:700; letter-spacing:.06em; color:#e0e0ff; }
+    .auth-subtitle { font-size:.75rem; color:#555; letter-spacing:.05em; margin-top:.2rem; }
+    .field-group   { margin-bottom:1.2rem; }
+    .field-label   { display:block; font-size:.72rem; color:#555; text-transform:uppercase;
+                     letter-spacing:.08em; margin-bottom:.45rem; }
+    .field-input   { width:100%; background:#0a0a1a; border:1px solid #1a1a44; color:#e0e0ff;
+                     border-radius:8px; padding:.6rem .9rem; font-size:.9rem; outline:none;
+                     transition:border-color .15s; }
+    .field-input:focus { border-color:#4466ff; }
+    .field-input::placeholder { color:#334; }
+    .auth-btn      { width:100%; background:#4466ff; color:#fff; border:none; border-radius:8px;
+                     padding:.7rem; font-size:.9rem; font-weight:600; letter-spacing:.04em;
+                     cursor:pointer; margin-top:.5rem; transition:background .15s; }
+    .auth-btn:hover{ background:#3355ee; }
+    .auth-error    { background:#2a0a0a; border:1px solid #441111; border-radius:8px;
+                     padding:.7rem 1rem; color:#ff6666; font-size:.83rem; margin-bottom:1.2rem; }
+    .auth-footer   { text-align:center; margin-top:1.5rem; font-size:.82rem; color:#555; }
+    .auth-footer a { color:#88aaff; text-decoration:none; }
+    .auth-footer a:hover { color:#aabbff; }
+    .auth-divider  { border:none; border-top:1px solid #1a1a44; margin:1.5rem 0; }
+    .demo-hint     { background:#0d0f18; border:1px solid #1a1a44; border-radius:8px;
+                     padding:.7rem 1rem; margin-top:1rem; }
+    .demo-row      { display:flex; justify-content:space-between; align-items:center;
+                     font-size:.75rem; padding:.15rem 0; }
+    .demo-key      { color:#555; font-family:'JetBrains Mono','Courier New',monospace; }
+    .demo-val      { color:#88aaff; font-family:'JetBrains Mono','Courier New',monospace; }
+</style>
+
+<div class="auth-wrap">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <span class="auth-logo-icon">🚀</span>
+            <div class="auth-title">MISSION CLEAR</div>
+            <div class="auth-subtitle">CENTRO DE CONTROLE ORBITAL</div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="auth-error">⚠ @Model.Error</div>
+        }
+
+        <form asp-action="Login" method="post">
+            <input asp-for="ReturnUrl" type="hidden" />
+
+            <div class="field-group">
+                <label class="field-label" asp-for="Email">E-mail</label>
+                <input asp-for="Email" type="email" class="field-input"
+                       placeholder="piloto@missao.com" autocomplete="email" />
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" asp-for="Password">Senha</label>
+                <input asp-for="Password" type="password" class="field-input"
+                       placeholder="••••••••" autocomplete="current-password" />
+            </div>
+
+            <button type="submit" class="auth-btn">ENTRAR</button>
+        </form>
+
+        <hr class="auth-divider" />
+
+        <div class="demo-hint">
+            <div style="font-size:.68rem;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">
+                Credenciais de Demonstração
+            </div>
+            <div class="demo-row">
+                <span class="demo-key">demo@missionclear.app</span>
+                <span class="demo-val">Demo@123456</span>
+            </div>
+            <div class="demo-row">
+                <span class="demo-key">admin@missionclear.app</span>
+                <span class="demo-val">Admin@123456</span>
+            </div>
+        </div>
+
+        <p class="auth-footer">
+            Não tem conta? <a asp-action="Register">Criar conta</a>
+        </p>
+    </div>
 </div>

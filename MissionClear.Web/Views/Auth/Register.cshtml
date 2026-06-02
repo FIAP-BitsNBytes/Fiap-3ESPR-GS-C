@@ -1,22 +1,85 @@
 @model RegisterViewModel
-@{ ViewData["Title"] = "Registrar"; }
+@{ ViewData["Title"] = "Criar Conta"; }
 
-<div class="card" style="max-width:400px;margin:2rem auto">
-    <h2>Criar Conta</h2>
-    @if (!string.IsNullOrEmpty(Model.Error))
-    {
-        <div class="error">@Model.Error</div>
-    }
-    <form asp-action="Register" method="post">
-        <label>Nome</label>
-        <input asp-for="DisplayName" placeholder="Piloto Guss" />
-        <label>Email</label>
-        <input asp-for="Email" type="email" placeholder="piloto@missao.com" />
-        <label>Senha (mín. 8 chars, 1 maiúscula, 1 número)</label>
-        <input asp-for="Password" type="password" placeholder="••••••••" />
-        <button type="submit" class="btn btn-primary" style="width:100%;margin-top:.5rem">Registrar</button>
-    </form>
-    <p style="margin-top:1rem;color:#aaa;font-size:.9rem">
-        Já tem conta? <a asp-action="Login">Entrar</a>
-    </p>
+<style>
+    .auth-wrap     { min-height: 75vh; display:flex; align-items:center; justify-content:center; }
+    .auth-card     { width:100%; max-width:420px; background:#111133;
+                     border:1px solid #1a1a44; border-radius:14px; padding:2.5rem 2rem; }
+    .auth-logo     { text-align:center; margin-bottom:2rem; }
+    .auth-logo-icon{ font-size:2.4rem; display:block; margin-bottom:.4rem; }
+    .auth-title    { font-size:1.2rem; font-weight:700; letter-spacing:.06em; color:#e0e0ff; }
+    .auth-subtitle { font-size:.75rem; color:#555; letter-spacing:.05em; margin-top:.2rem; }
+    .field-group   { margin-bottom:1.2rem; }
+    .field-label   { display:block; font-size:.72rem; color:#555; text-transform:uppercase;
+                     letter-spacing:.08em; margin-bottom:.45rem; }
+    .field-input   { width:100%; background:#0a0a1a; border:1px solid #1a1a44; color:#e0e0ff;
+                     border-radius:8px; padding:.6rem .9rem; font-size:.9rem; outline:none;
+                     transition:border-color .15s; }
+    .field-input:focus { border-color:#4466ff; }
+    .field-input::placeholder { color:#334; }
+    .field-hint    { font-size:.7rem; color:#445; margin-top:.3rem; }
+    .auth-btn      { width:100%; background:#4466ff; color:#fff; border:none; border-radius:8px;
+                     padding:.7rem; font-size:.9rem; font-weight:600; letter-spacing:.04em;
+                     cursor:pointer; margin-top:.5rem; transition:background .15s; }
+    .auth-btn:hover{ background:#3355ee; }
+    .auth-error    { background:#2a0a0a; border:1px solid #441111; border-radius:8px;
+                     padding:.7rem 1rem; color:#ff6666; font-size:.83rem; margin-bottom:1.2rem; }
+    .auth-footer   { text-align:center; margin-top:1.5rem; font-size:.82rem; color:#555; }
+    .auth-footer a { color:#88aaff; text-decoration:none; }
+    .auth-footer a:hover { color:#aabbff; }
+    .role-badge    { display:inline-block; background:#1a1a44; border:1px solid #2a2a66;
+                     border-radius:20px; padding:.2rem .8rem; font-size:.7rem; color:#88aaff;
+                     letter-spacing:.05em; margin-top:.5rem; }
+</style>
+
+<div class="auth-wrap">
+    <div class="auth-card">
+        <div class="auth-logo">
+            <span class="auth-logo-icon">🚀</span>
+            <div class="auth-title">MISSION CLEAR</div>
+            <div class="auth-subtitle">REGISTRO DE PILOTO</div>
+        </div>
+
+        @if (!string.IsNullOrEmpty(Model.Error))
+        {
+            <div class="auth-error">⚠ @Model.Error</div>
+        }
+
+        <form asp-action="Register" method="post">
+            <div class="field-group">
+                <label class="field-label" asp-for="DisplayName">Nome de Piloto</label>
+                <input asp-for="DisplayName" class="field-input"
+                       placeholder="Piloto Guss" autocomplete="name" />
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" asp-for="Email">E-mail</label>
+                <input asp-for="Email" type="email" class="field-input"
+                       placeholder="piloto@missao.com" autocomplete="email" />
+            </div>
+
+            <div class="field-group">
+                <label class="field-label" asp-for="Password">Senha</label>
+                <input asp-for="Password" type="password" class="field-input"
+                       placeholder="••••••••" autocomplete="new-password" />
+                <div class="field-hint">Mínimo 8 caracteres · 1 maiúscula · 1 número</div>
+            </div>
+
+            <div style="margin-bottom:1.2rem">
+                <div style="font-size:.72rem;color:#555;text-transform:uppercase;letter-spacing:.08em;margin-bottom:.4rem">
+                    Acesso atribuído
+                </div>
+                <span class="role-badge">● RESEARCHER</span>
+                <div class="field-hint" style="margin-top:.4rem">
+                    Novos cadastros recebem role Researcher. Promoção a Administrator via painel admin.
+                </div>
+            </div>
+
+            <button type="submit" class="auth-btn">CRIAR CONTA</button>
+        </form>
+
+        <p class="auth-footer">
+            Já tem conta? <a asp-action="Login">Entrar</a>
+        </p>
+    </div>
 </div>

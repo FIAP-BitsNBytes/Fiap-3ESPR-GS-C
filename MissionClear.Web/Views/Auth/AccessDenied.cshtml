@@ -1,7 +1,28 @@
 @{ ViewData["Title"] = "Acesso Negado"; }
-<div class="card" style="max-width:500px;margin:2rem auto;text-align:center">
-    <h2>🚫 Acesso Negado</h2>
-    <p>Você não tem permissão para acessar esta área.</p>
-    <p style="color:#aaa">Esta página requer o perfil <strong>Administrator</strong>.</p>
-    <a asp-controller="Dashboard" asp-action="Index" class="btn btn-primary">Voltar ao Dashboard</a>
+
+<style>
+    .denied-wrap { min-height:70vh; display:flex; align-items:center; justify-content:center; }
+    .denied-card { width:100%; max-width:420px; background:#111133; border:1px solid #441111;
+                   border-radius:14px; padding:2.5rem 2rem; text-align:center; }
+</style>
+
+<div class="denied-wrap">
+    <div class="denied-card">
+        <div style="font-size:3rem;margin-bottom:1rem">🚫</div>
+        <div style="font-size:.72rem;color:#C0392B;text-transform:uppercase;letter-spacing:.1em;margin-bottom:.5rem">
+            Acesso Negado
+        </div>
+        <h2 style="font-size:1.1rem;font-weight:700;color:#e0e0ff;margin-bottom:1rem">
+            Permissão Insuficiente
+        </h2>
+        <p style="font-size:.85rem;color:#555;margin-bottom:1.5rem">
+            Esta área requer o perfil <span style="color:#88aaff;font-weight:600">Administrator</span>.
+            Contacte um administrador do sistema para solicitar acesso.
+        </p>
+        <a asp-controller="Dashboard" asp-action="Index"
+           style="display:inline-block;background:#4466ff;color:#fff;border:none;border-radius:8px;
+                  padding:.6rem 1.5rem;font-size:.85rem;font-weight:600;text-decoration:none;letter-spacing:.04em">
+            ← Voltar ao Dashboard
+        </a>
+    </div>
 </div>
