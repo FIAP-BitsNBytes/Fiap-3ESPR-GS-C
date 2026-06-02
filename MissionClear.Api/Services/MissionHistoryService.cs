@@ -47,6 +47,14 @@ public sealed class MissionHistoryService(IMissionRepository missionRepo) : IMis
             PaginationDto.From(page, limit, result.TotalCount));
     }
 
+    public async Task<MissionDetailResponse> GetMissionDetailAdminAsync(Guid id, CancellationToken ct)
+    {
+        var mission = await missionRepo.GetByIdAsync(id, ct)
+            ?? throw new DomainException("MISSION_NOT_FOUND", "Mission not found.", 404);
+
+        return BuildDetailResponse(mission);
+    }
+
     public async Task<MissionDetailResponse> GetMissionDetailAsync(Guid id, Guid userId, CancellationToken ct)
     {
         var mission = await missionRepo.GetByIdAsync(id, ct)
@@ -55,8 +63,12 @@ public sealed class MissionHistoryService(IMissionRepository missionRepo) : IMis
         if (mission.UserId != userId)
             throw new DomainException("FORBIDDEN", "You do not have access to this mission.", 403);
 
-        var (eff, saf, total) = MissionScoring.Compute(mission.DeltaVKmS, mission.RiskScore);
+        return BuildDetailResponse(mission);
+    }
 
+    private MissionDetailResponse BuildDetailResponse(MissionEntity mission)
+    {
+        var (eff, saf, total) = MissionScoring.Compute(mission.DeltaVKmS, mission.RiskScore);
         var obstacles = JsonSerializer.Deserialize<List<ObstacleDto>>(
             mission.ObstaclesJson ?? "[]", JsonOptions) ?? [];
 

@@ -28,6 +28,13 @@ public interface IMissionHistoryService
         CancellationToken ct = default);
 
     /// <summary>
+    /// Detalhe de qualquer missão, sem verificação de ownership. Uso exclusivo admin.
+    /// </summary>
+    Task<MissionDetailResponse> GetMissionDetailAdminAsync(
+        Guid id,
+        CancellationToken ct = default);
+
+    /// <summary>
     /// Estatísticas agregadas do usuário.
     /// Mapeado para GET /api/missions/stats
     /// </summary>

@@ -25,7 +25,7 @@ public sealed class MissionRepository(AppDbContext context) : IMissionRepository
             query = query.Where(m => m.Status == status);
 
         if (!string.IsNullOrWhiteSpace(destination))
-            query = query.Where(m => m.Destination == destination);
+            query = query.Where(m => m.Destination.Contains(destination));
 
         var total = await query.CountAsync(ct);
 
@@ -37,6 +37,39 @@ public sealed class MissionRepository(AppDbContext context) : IMissionRepository
         };
 
         var items = await query
+            .Skip((page - 1) * limit)
+            .Take(limit)
+            .ToListAsync(ct);
+
+        return new MissionPageResult(items, total);
+    }
+
+    public async Task<Dictionary<Guid, int>> GetMissionCountsPerUserAsync(CancellationToken ct = default)
+    {
+        return await context.Missions
+            .GroupBy(m => m.UserId)
+            .Select(g => new { UserId = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(x => x.UserId, x => x.Count, ct);
+    }
+
+    public async Task<MissionPageResult> GetAllPagedAsync(
+        int page, int limit,
+        string? status = null,
+        string? destination = null,
+        CancellationToken ct = default)
+    {
+        var query = context.Missions.Include(m => m.User).AsQueryable();
+
+        if (!string.IsNullOrWhiteSpace(status))
+            query = query.Where(m => m.Status == status);
+
+        if (!string.IsNullOrWhiteSpace(destination))
+            query = query.Where(m => m.Destination.Contains(destination));
+
+        var total = await query.CountAsync(ct);
+
+        var items = await query
+            .OrderByDescending(m => m.CreatedAt)
             .Skip((page - 1) * limit)
             .Take(limit)
             .ToListAsync(ct);

@@ -33,6 +33,12 @@ public interface IMissionRepository
         string sort = "created_at_desc", 
         CancellationToken ct = default);
         
+    Task<Dictionary<Guid, int>> GetMissionCountsPerUserAsync(CancellationToken ct = default);
+    Task<MissionPageResult> GetAllPagedAsync(
+        int page, int limit,
+        string? status = null,
+        string? destination = null,
+        CancellationToken ct = default);
     Task AddAsync(MissionEntity mission, CancellationToken ct = default);
     Task DeleteAsync(MissionEntity mission, CancellationToken ct = default);
     Task<MissionStatsProjection> GetUserStatsAsync(Guid userId, CancellationToken ct = default);
