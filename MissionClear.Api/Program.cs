@@ -133,7 +133,7 @@ builder.Services.AddHttpClient("celestrak", client =>
     client.DefaultRequestHeaders.AcceptEncoding.ParseAdd("gzip, deflate, br");
     client.DefaultRequestHeaders.AcceptLanguage.ParseAdd("en-US,en;q=0.9");
     client.DefaultRequestHeaders.Add("DNT", "1");
-    client.Timeout = TimeSpan.FromSeconds(12);
+    client.Timeout = TimeSpan.FromSeconds(30);
 });
 builder.Services.AddHttpClient("keeptrack", client =>
 {
@@ -175,8 +175,10 @@ if (!app.Environment.IsEnvironment("Testing"))
 {
     using (var scope = app.Services.CreateScope())
     {
-        var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var db     = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+        var seederLog = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
         await db.Database.MigrateAsync();
+        await MissionSeeder.SeedAsync(db, seederLog);
     }
 }
 
