@@ -106,15 +106,15 @@ public sealed class DataAggregatorServiceTests
     }
 
     [Fact]
-    public async Task FetchAndMergeAsync_CelesTrakFails_ThrowsOrFallsBack()
+    public async Task FetchAndMergeAsync_CelesTrakFails_FallsBackToEmbeddedSeed()
     {
+        // CelesTrak 503 → DB fallback (scope mock has no AppDbContext → caught) → embedded seed
         var sut = CreateSut(MockHttpMessageHandler.Status(HttpStatusCode.ServiceUnavailable));
 
-        // All catalogs fail → DB fallback → scope mock has no AppDbContext → throws
-        var act = () => sut.FetchAndMergeAsync();
+        await sut.FetchAndMergeAsync(); // must NOT throw
 
-        await act.Should().ThrowAsync<Exception>();
-        sut._capturedUpdates.Should().BeEmpty();
+        sut._capturedUpdates.Should().HaveCount(1);
+        sut._capturedUpdates![0].Should().NotBeEmpty("embedded seed must load as last fallback");
     }
 
     [Fact]

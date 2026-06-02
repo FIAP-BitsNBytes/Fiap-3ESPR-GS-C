@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using MissionClear.Api.Configuration;
 using MissionClear.Api.Data;
+using MissionClear.Api.Entities;
 using MissionClear.Api.Models;
 using MissionClear.Api.Services.Interfaces;
 
@@ -85,6 +86,14 @@ public sealed class DataAggregatorService : IDataAggregatorService
                     allObjects[obj.Id] = obj;
 
                 anySucceeded = true;
+
+                // Publish intermediate snapshot so /api/debris is usable after the first
+                // successful catalog instead of waiting for all 8 (up to ~37s with delays).
+                if (!fromCache && objects.Count > 0)
+                {
+                    var partial = allObjects.Values.ToList().AsReadOnly();
+                    _cache.Update(partial, isFetch: true);
+                }
             }
             catch (Exception ex) when (!(ex is OperationCanceledException && ct.IsCancellationRequested))
             {
@@ -103,14 +112,21 @@ public sealed class DataAggregatorService : IDataAggregatorService
         if (!anySucceeded)
         {
             _logger.LogWarning("All CelesTrak catalogs failed. Falling back to database seed.");
-            var seed = await FetchFromDatabaseAsync(ct);
-            foreach (var obj in seed)
-                allObjects[obj.Id] = obj;
-            _logger.LogInformation("Database fallback: loaded {Count} records", allObjects.Count);
+            try
+            {
+                var seed = await FetchFromDatabaseAsync(ct);
+                foreach (var obj in seed)
+                    allObjects[obj.Id] = obj;
+                _logger.LogInformation("Database fallback: loaded {Count} records", allObjects.Count);
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                _logger.LogError(ex, "Database fallback failed — will try embedded seed");
+            }
 
             if (allObjects.Count == 0)
             {
-                _logger.LogWarning("Database empty — loading embedded TLE seed for offline operation");
+                _logger.LogWarning("Database empty or unavailable — loading embedded TLE seed");
                 var embedded = LoadEmbeddedSeed();
                 foreach (var obj in embedded)
                     allObjects[obj.Id] = obj;
@@ -133,6 +149,54 @@ public sealed class DataAggregatorService : IDataAggregatorService
 
         _logger.LogInformation(
             "OrbitalCache updated: {Total} objects from all sources", result.Count);
+
+        if (anySucceeded)
+            await PersistToDatabaseAsync(result, ct);
+    }
+
+    // ── Database persistence ──────────────────────────────────────────────────
+
+    private async Task PersistToDatabaseAsync(
+        IReadOnlyList<OrbitalObject> objects, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+
+            await db.OrbitalObjects.ExecuteDeleteAsync(ct);
+
+            var now = DateTime.UtcNow;
+            var entities = objects.Select(o => new OrbitalObjectEntity
+            {
+                Id          = o.Id.Length > 50  ? o.Id[..50]   : o.Id,
+                Name        = o.Name.Length > 100 ? o.Name[..100] : o.Name,
+                Type        = o.Type,
+                Latitude    = o.Latitude,
+                Longitude   = o.Longitude,
+                AltitudeKm  = o.AltitudeKm,
+                VelocityKmS = o.VelocityKmS,
+                Source      = o.Source.Length > 50 ? o.Source[..50] : o.Source,
+                TleLine1    = o.TleLine1,
+                TleLine2    = o.TleLine2,
+                UpdatedAt   = now,
+            }).ToList();
+
+            const int chunkSize = 1000;
+            for (int i = 0; i < entities.Count; i += chunkSize)
+            {
+                db.OrbitalObjects.AddRange(entities.Skip(i).Take(chunkSize));
+                await db.SaveChangesAsync(ct);
+                db.ChangeTracker.Clear();
+            }
+
+            _logger.LogInformation(
+                "Persisted {Count} orbital objects to database", entities.Count);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            _logger.LogError(ex, "Failed to persist orbital objects to database — cache unaffected");
+        }
     }
 
     // ── CelesTrak TLE fetch ───────────────────────────────────────────────────
@@ -269,18 +333,10 @@ public sealed class DataAggregatorService : IDataAggregatorService
 
     // ── Network diagnostics ───────────────────────────────────────────────────
 
-    private static bool IsNetworkUnreachable(Exception ex)
-    {
-        if (ex is HttpRequestException { InnerException: System.Net.Sockets.SocketException })
-            return true;
-        if (ex is HttpRequestException { InnerException: TaskCanceledException { InnerException: TimeoutException } })
-            return true;
-        if (ex is HttpRequestException httpEx &&
-            (httpEx.Message.Contains("timed out", StringComparison.OrdinalIgnoreCase) ||
-             httpEx.Message.Contains("TimedOut", StringComparison.OrdinalIgnoreCase)))
-            return true;
-        return false;
-    }
+    // Returns true only for genuine network-layer failures (DNS, TCP reset, host unreachable).
+    // HTTP timeouts are per-catalog server slowness — not grounds to skip remaining catalogs.
+    private static bool IsNetworkUnreachable(Exception ex) =>
+        ex is HttpRequestException { InnerException: System.Net.Sockets.SocketException };
 
     // ── Embedded TLE seed (offline fallback) ─────────────────────────────────
 
@@ -305,9 +361,10 @@ public sealed class DataAggregatorService : IDataAggregatorService
         using var scope = _scopeFactory.CreateScope();
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
         var entities = await db.OrbitalObjects.AsNoTracking().ToListAsync(ct);
+        var now = DateTime.UtcNow;
         return entities.Select(e => new OrbitalObject(
             e.Id, e.Name, e.Type, e.Latitude, e.Longitude, e.AltitudeKm, e.VelocityKmS,
-            e.Source, e.UpdatedAt, e.TleLine1, e.TleLine2)).ToList();
+            e.Source, now, e.TleLine1, e.TleLine2)).ToList();
     }
 
     // ── KeepTrack ─────────────────────────────────────────────────────────────

@@ -71,51 +71,18 @@ public sealed class AdminRefreshTests(TestWebApplicationFactory factory)
         resp.StatusCode.Should().Be(HttpStatusCode.Forbidden);
     }
 
-    [Fact]
-    public async Task Refresh_AdministratorRole_Returns200OrServiceUnavailable()
-    {
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", GenerateToken("Administrator"));
+    // DESATIVADO: dispara DataAggregatorService.FetchAndMergeAsync() sem mock do aggregator.
+    // Se ImmediateFailHandler no TestWebApplicationFactory não interceptar corretamente,
+    // o teste faz chamadas HTTP reais ao celestrak.org e pode bloquear o IP.
+    // Cobertura equivalente: AdminRefreshAggressiveTests.Refresh_AggregatorSucceeds_Returns200WithCorrectShape
+    // [Fact]
+    // public async Task Refresh_AdministratorRole_Returns200OrServiceUnavailable() { ... }
 
-        var resp = await _client.PostAsync("/api/admin/refresh", null);
-        _client.DefaultRequestHeaders.Authorization = null;
+    // DESATIVADO: mesmo motivo — usa _client sem mock do aggregator, depende de rede real.
+    // [Fact]
+    // public async Task Refresh_ResponseShape_HasRequiredFields() { ... }
 
-        // 200 OK quando CelesTrak acessível, 503 quando não (CI/offline)
-        resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
-    }
-
-    [Fact]
-    public async Task Refresh_ResponseShape_HasRequiredFields()
-    {
-        _client.DefaultRequestHeaders.Authorization =
-            new AuthenticationHeaderValue("Bearer", GenerateToken("Administrator"));
-
-        var resp = await _client.PostAsync("/api/admin/refresh", null);
-        _client.DefaultRequestHeaders.Authorization = null;
-
-        if (resp.StatusCode != HttpStatusCode.OK) return; // tolera falha de rede
-
-        var root = JsonDocument.Parse(await resp.Content.ReadAsStringAsync()).RootElement;
-        root.TryGetProperty("objects_in_cache", out _).Should().BeTrue();
-        root.TryGetProperty("last_fetch",       out _).Should().BeTrue();
-        root.TryGetProperty("message",          out _).Should().BeTrue();
-        root.TryGetProperty("ObjectsInCache",   out _).Should().BeFalse("must be snake_case");
-    }
-
-    [Fact]
-    public async Task Refresh_IsIdempotent_CanBeCalledMultipleTimes()
-    {
-        var token = GenerateToken("Administrator");
-
-        for (var i = 0; i < 2; i++)
-        {
-            _client.DefaultRequestHeaders.Authorization =
-                new AuthenticationHeaderValue("Bearer", token);
-
-            var resp = await _client.PostAsync("/api/admin/refresh", null);
-            _client.DefaultRequestHeaders.Authorization = null;
-
-            resp.StatusCode.Should().BeOneOf(HttpStatusCode.OK, HttpStatusCode.ServiceUnavailable);
-        }
-    }
+    // DESATIVADO: chama /api/admin/refresh duas vezes sem mock — risco de 2x chamadas reais.
+    // [Fact]
+    // public async Task Refresh_IsIdempotent_CanBeCalledMultipleTimes() { ... }
 }

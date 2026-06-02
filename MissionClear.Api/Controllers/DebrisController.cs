@@ -65,7 +65,7 @@ public sealed class DebrisController(IOrbitalCache cache) : BaseApiController
             ByType:       new ByTypeDto(debris, satellite, rocket),
             ByAltitudeBand: new ByAltitudeBandDto(low, mid, high),
             Sources:      new SourcesDto(
-                              all.Count(o => o.Source == "celestrak"),
+                              all.Count(o => o.Source.StartsWith("celestrak", StringComparison.OrdinalIgnoreCase)),
                               all.Count(o => o.Source == "keeptrack")),
             LastUpdated:  (cache.LastPropagation ?? DateTime.UtcNow).ToString("O")));
     }
