@@ -1,9 +1,11 @@
 using System.Text.Json;
 using System.Text.RegularExpressions;
 using MissionClear.Api.Data.Repositories;
+using MissionClear.Api.Dtos.Orbital;
 using MissionClear.Api.Dtos.User;
 using MissionClear.Api.Entities;
 using MissionClear.Api.Exceptions;
+using MissionClear.Api.Models;
 using MissionClear.Api.Services.Interfaces;
 
 namespace MissionClear.Api.Services;
@@ -11,7 +13,8 @@ namespace MissionClear.Api.Services;
 public sealed class UserService(
     IUserRepository userRepo,
     IMissionRepository missionRepo,
-    IFavoritesRepository favoritesRepo) : IUserService
+    IFavoritesRepository favoritesRepo,
+    IOrbitalCache orbitalCache) : IUserService
 {
     private static readonly Regex PasswordRegex =
         new(@"^(?=.*[A-Z])(?=.*\d).{8,}$", RegexOptions.Compiled);
@@ -101,6 +104,86 @@ public sealed class UserService(
         var debris      = await favoritesRepo.GetDebrisAsync(userId, ct);
         var savedWindows = await favoritesRepo.GetWindowsAsync(userId, ct);
         return BuildFavoritesResponse(debris, savedWindows);
+    }
+
+    public async Task<IReadOnlyList<DebrisDto>> GetFavoriteDebrisFilteredAsync(
+        Guid userId, string? type, string sort, CancellationToken ct = default)
+    {
+        var favoriteEntities = await favoritesRepo.GetDebrisAsync(userId, ct);
+        var savedIds = favoriteEntities.Select(f => f.DebrisId).ToHashSet(StringComparer.Ordinal);
+
+        var query = orbitalCache.GetAll().Where(o => savedIds.Contains(o.Id));
+
+        if (!string.IsNullOrWhiteSpace(type))
+            query = query.Where(o => o.Type == type);
+
+        IEnumerable<OrbitalObject> sorted = sort switch
+        {
+            "altitude_desc"  => query.OrderByDescending(o => o.AltitudeKm),
+            "velocity_desc"  => query.OrderByDescending(o => o.VelocityKmS),
+            "name_asc"       => query.OrderBy(o => o.Name, StringComparer.OrdinalIgnoreCase),
+            _                => query.OrderBy(o => o.AltitudeKm),
+        };
+
+        return sorted
+            .Select(o => new DebrisDto(
+                o.Id, o.Name, o.Type,
+                o.Latitude, o.Longitude,
+                o.AltitudeKm, o.VelocityKmS,
+                o.Source, o.UpdatedAt.ToString("O")))
+            .ToList();
+    }
+
+    public async Task<IReadOnlyList<object>> GetFavoriteWindowsFilteredAsync(
+        Guid userId, string? destination, string sort, CancellationToken ct = default)
+    {
+        var entities = await favoritesRepo.GetWindowsFilteredAsync(userId, destination, ct);
+
+        if (sort is "departure_asc" or "risk_asc")
+        {
+            var withMeta = entities
+                .Select(e =>
+                {
+                    object? deserialized;
+                    try { deserialized = System.Text.Json.JsonSerializer.Deserialize<object>(e.WindowJson); }
+                    catch { return ((object, double)?)null; }
+                    if (deserialized is null) return null;
+
+                    double sortKey;
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(e.WindowJson);
+                        var root = doc.RootElement;
+                        sortKey = sort == "departure_asc"
+                            ? (root.TryGetProperty("window", out var win) &&
+                               win.TryGetProperty("start", out var start) &&
+                               DateTime.TryParse(start.GetString(), out var dt)
+                               ? dt.Ticks : double.MaxValue)
+                            : (root.TryGetProperty("window", out var winR) &&
+                               winR.TryGetProperty("risk_score", out var risk)
+                               ? risk.GetDouble() : double.MaxValue);
+                    }
+                    catch { sortKey = double.MaxValue; }
+
+                    return ((object, double)?)(deserialized, sortKey);
+                })
+                .Where(x => x.HasValue)
+                .Select(x => x!.Value)
+                .OrderBy(x => x.Item2)
+                .Select(x => x.Item1)
+                .ToList();
+
+            return withMeta;
+        }
+
+        return entities
+            .Select(e =>
+            {
+                try { return System.Text.Json.JsonSerializer.Deserialize<object>(e.WindowJson); }
+                catch { return null; }
+            })
+            .OfType<object>()
+            .ToList();
     }
 
     private static FavoritesResponse BuildFavoritesResponse(
