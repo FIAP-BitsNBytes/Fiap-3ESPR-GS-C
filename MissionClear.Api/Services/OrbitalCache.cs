@@ -79,7 +79,7 @@ public sealed class OrbitalCache : IOrbitalCache
 
             _snapshot = filtered.AsReadOnly();
 
-            if (isFetch)
+            if (isFetch || objects.Any(o => o.TleLine1 is not null))
                 LastFetch = now;
             else
                 LastPropagation = now;
