@@ -17,7 +17,7 @@ public sealed class ExternalApiSettings
         new("https://celestrak.org/NORAD/elements/gp.php?GROUP=iridium-33-debris&FORMAT=tle",  "iridium-debris"),
         new("https://celestrak.org/NORAD/elements/gp.php?GROUP=active&FORMAT=tle",             "active"),
         new("https://celestrak.org/NORAD/elements/gp.php?GROUP=cosmos-1408-debris&FORMAT=tle", "cosmos-1408-debris"),
-        new("https://celestrak.org/NORAD/elements/gp.php?GROUP=starlink&FORMAT=tle",           "starlink"),
+        new("https://celestrak.org/NORAD/elements/gp.php?GROUP=breeze-m-debris&FORMAT=tle",   "breeze-m-debris"),
     ];
 
     /// <summary>Seconds to wait between consecutive CelesTrak catalog fetches.</summary>
