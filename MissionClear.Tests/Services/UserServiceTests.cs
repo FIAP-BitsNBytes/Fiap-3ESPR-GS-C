@@ -5,6 +5,7 @@ using MissionClear.Api.Dtos.User;
 using MissionClear.Api.Entities;
 using MissionClear.Api.Exceptions;
 using MissionClear.Api.Services;
+using MissionClear.Api.Services.Interfaces;
 using Moq;
 using Xunit;
 
@@ -12,14 +13,15 @@ namespace MissionClear.Tests.Services;
 
 public sealed class UserServiceTests
 {
-    private readonly Mock<IUserRepository>     _userRepo      = new();
-    private readonly Mock<IMissionRepository>  _missionRepo   = new();
+    private readonly Mock<IUserRepository>      _userRepo      = new();
+    private readonly Mock<IMissionRepository>   _missionRepo   = new();
     private readonly Mock<IFavoritesRepository> _favoritesRepo = new();
+    private readonly Mock<IOrbitalCache>        _orbitalCache  = new();
     private readonly UserService _service;
 
     public UserServiceTests()
     {
-        _service = new UserService(_userRepo.Object, _missionRepo.Object, _favoritesRepo.Object);
+        _service = new UserService(_userRepo.Object, _missionRepo.Object, _favoritesRepo.Object, _orbitalCache.Object);
     }
 
     private static UserEntity MakeUser(Guid? id = null) => new()
