@@ -190,10 +190,53 @@ public sealed class AuthServiceTests
     // ── LogoutAsync ──────────────────────────────────────────────────────────
 
     [Fact]
-    public async Task LogoutAsync_RevokesToken()
+    public async Task LogoutAsync_RevokesToken_WhenCallerOwnsToken()
     {
-        await _service.LogoutAsync(new LogoutRequest("some-token"), default);
+        var callerId = Guid.NewGuid();
+        var tokenEntity = new RefreshTokenEntity
+        {
+            UserId = callerId,
+            Token  = "some-token",
+            ExpiresAt = DateTime.UtcNow.AddDays(1)
+        };
+        _tokenRepo.Setup(r => r.GetByTokenAsync("some-token", default))
+                  .ReturnsAsync(tokenEntity);
 
-        _tokenRepo.Verify(r => r.RevokeByTokenAsync("some-token", default));
+        await _service.LogoutAsync(new LogoutRequest("some-token"), callerId, default);
+
+        tokenEntity.IsRevoked.Should().BeTrue();
+        _tokenRepo.Verify(r => r.SaveChangesAsync(default), Times.Once);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_DoesNothing_WhenTokenBelongsToOtherUser()
+    {
+        var callerId = Guid.NewGuid();
+        var otherUserId = Guid.NewGuid();
+        var tokenEntity = new RefreshTokenEntity
+        {
+            UserId = otherUserId,
+            Token  = "other-token",
+            ExpiresAt = DateTime.UtcNow.AddDays(1)
+        };
+        _tokenRepo.Setup(r => r.GetByTokenAsync("other-token", default))
+                  .ReturnsAsync(tokenEntity);
+
+        await _service.LogoutAsync(new LogoutRequest("other-token"), callerId, default);
+
+        tokenEntity.IsRevoked.Should().BeFalse();
+        _tokenRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task LogoutAsync_DoesNothing_WhenTokenNotFound()
+    {
+        var callerId = Guid.NewGuid();
+        _tokenRepo.Setup(r => r.GetByTokenAsync("ghost-token", default))
+                  .ReturnsAsync((RefreshTokenEntity?)null);
+
+        await _service.LogoutAsync(new LogoutRequest("ghost-token"), callerId, default);
+
+        _tokenRepo.Verify(r => r.SaveChangesAsync(It.IsAny<CancellationToken>()), Times.Never);
     }
 }

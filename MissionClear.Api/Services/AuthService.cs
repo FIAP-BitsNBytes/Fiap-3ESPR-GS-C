@@ -68,9 +68,13 @@ public sealed class AuthService(
             jwtOptions.Value.AccessTokenMinutes * 60);
     }
 
-    public async Task LogoutAsync(LogoutRequest request, CancellationToken ct = default)
+    public async Task LogoutAsync(LogoutRequest request, Guid callerId, CancellationToken ct = default)
     {
-        await tokenRepo.RevokeByTokenAsync(request.RefreshToken, ct);
+        var token = await tokenRepo.GetByTokenAsync(request.RefreshToken, ct);
+        // Silently ignore if token not found or belongs to another user (no info leak).
+        if (token is null || token.UserId != callerId) return;
+
+        token.IsRevoked = true;
         await tokenRepo.SaveChangesAsync(ct);
     }
 

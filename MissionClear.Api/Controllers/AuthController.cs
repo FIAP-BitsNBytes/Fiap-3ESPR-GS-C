@@ -44,7 +44,7 @@ public sealed class AuthController(IAuthService authService) : BaseApiController
         [FromBody] LogoutRequest request,
         CancellationToken ct)
     {
-        await authService.LogoutAsync(request, ct);
+        await authService.LogoutAsync(request, CurrentUserId, ct);
         return NoContent();
     }
 }
