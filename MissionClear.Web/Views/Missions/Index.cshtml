@@ -1,34 +1,361 @@
-@{ ViewData["Title"] = "Minhas Missões"; }
-
-<h1>Histórico de Missões</h1>
-
-<div class="card">
-    <form method="get" style="display:flex;gap:1rem;align-items:flex-end">
-        <div style="flex:1">
-            <label>Filtrar por status</label>
-            <select name="status">
-                @{
-                    string sSelected = ViewBag.StatusFilter == "success" ? "selected" : "";
-                    string fSelected = ViewBag.StatusFilter == "failure" ? "selected" : "";
-                    string aSelected = ViewBag.StatusFilter == "aborted" ? "selected" : "";
-                    string tSelected = string.IsNullOrEmpty(ViewBag.StatusFilter) ? "selected" : "";
-                }
-                <!option value="" @tSelected>Todos</!option>
-                <!option value="success" @sSelected>Sucesso</!option>
-                <!option value="failure" @fSelected>Falha</!option>
-                <!option value="aborted" @aSelected>Abortado</!option>
-            </select>
-        </div>
-        <button type="submit" class="btn btn-primary">Filtrar</button>
-    </form>
-</div>
+@using System.Text.Json
+@{ ViewData["Title"] = "Missões"; }
 
 @{
-    if (ViewBag.MissionsJson is System.Text.Json.JsonElement json &&
-        json.ValueKind != System.Text.Json.JsonValueKind.Undefined)
+    // -- Missões --
+    var missionsOk  = ViewBag.MissionsJson is JsonElement mj
+                      && mj.ValueKind != JsonValueKind.Undefined;
+    var missionsEl  = missionsOk ? (JsonElement)ViewBag.MissionsJson : default;
+
+    int total = 0, totalPages = 1;
+    int currentPage = ViewBag.CurrentPage ?? 1;
+    string? statusFilter = ViewBag.StatusFilter;
+    string? destFilter   = ViewBag.DestinationFilter;
+    string? searchRaw    = ViewBag.SearchRaw;
+    bool    isAdmin      = ViewBag.IsAdmin == true;
+    var missions = new List<JsonElement>();
+
+    if (missionsOk)
     {
-        int total = 0;
-        try { total = json.GetProperty("pagination").GetProperty("total").GetInt32(); } catch { }
-        <p style="color:#aaa;font-size:.85rem">@total missões no total.</p>
+        if (missionsEl.TryGetProperty("pagination", out var pag))
+        {
+            if (pag.TryGetProperty("total", out var t)) total = t.GetInt32();
+            if (pag.TryGetProperty("limit", out var l) && l.GetInt32() > 0)
+                totalPages = (int)Math.Ceiling(total / (double)l.GetInt32());
+        }
+        if (missionsEl.TryGetProperty("data", out var data))
+            foreach (var item in data.EnumerateArray())
+                missions.Add(item);
+    }
+
+    // -- Stats --
+    var statsOk = ViewBag.StatsJson is JsonElement sj
+                  && sj.ValueKind != JsonValueKind.Undefined;
+    var statsEl = statsOk ? (JsonElement)ViewBag.StatsJson : default;
+
+    int statTotal = total, statSuccess = 0, statFailed = 0, statBest = 0, statAvg = 0;
+    double statRate = 0;
+    if (statsOk)
+    {
+        if (statsEl.TryGetProperty("total_missions",      out var v)) statTotal   = v.GetInt32();
+        if (statsEl.TryGetProperty("successful_missions", out var v2)) statSuccess = v2.GetInt32();
+        if (statsEl.TryGetProperty("failed_missions",     out var v3)) statFailed  = v3.GetInt32();
+        if (statsEl.TryGetProperty("best_score",          out var v4)) statBest    = v4.GetInt32();
+        if (statsEl.TryGetProperty("average_score",       out var v5)) statAvg     = v5.GetInt32();
+        if (statsEl.TryGetProperty("success_rate",        out var v6)) statRate    = v6.GetDouble();
+    }
+
+    string StatusColor(string? s) => s switch {
+        "success" => "#3DD6C8",
+        "failure" => "#C0392B",
+        "aborted" => "#D4A017",
+        _         => "#88aaff"
+    };
+    string StatusIcon(string? s) => s switch {
+        "success" => "✓",
+        "failure" => "✗",
+        "aborted" => "−",
+        _         => "?"
+    };
+    string RiskColor(double r) => r >= 0.7 ? "#C0392B" : r >= 0.4 ? "#D4A017" : "#3DD6C8";
+    string FormatDate(string? iso)
+    {
+        if (DateTime.TryParse(iso, out var dt))
+            return dt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+        return iso ?? "—";
+    }
+}
+
+<style>
+    .mission-kpi-card  { background:#111133; border:1px solid #1a1a44; border-radius:10px; padding:1.2rem 1rem; }
+    .mission-card      { background:#111133; border:1px solid #1a1a44; border-radius:10px; padding:1rem 1.2rem;
+                         display:flex; align-items:center; gap:1rem; text-decoration:none; color:inherit;
+                         transition:background .15s, border-color .15s; }
+    .mission-card:hover{ background:#16163d; border-color:#3344aa; }
+    .status-icon       { width:36px; height:36px; border-radius:50%; display:flex; align-items:center;
+                         justify-content:center; font-weight:700; font-size:1rem; flex-shrink:0; }
+    .chip              { display:inline-block; padding:.3rem .9rem; border-radius:20px; font-size:.78rem;
+                         font-weight:600; letter-spacing:.04em; text-decoration:none; border:1px solid; }
+    .chip-active       { background:#1a1a44; border-color:#4466ff; color:#88aaff; }
+    .chip-inactive     { background:transparent; border-color:#334; color:#666; }
+    .chip-inactive:hover{ border-color:#556; color:#aaa; }
+    .mono              { font-family:'JetBrains Mono', 'Courier New', monospace; }
+    .section-label     { font-size:.72rem; color:#555; text-transform:uppercase; letter-spacing:.08em; }
+    .page-btn          { background:#111133; border:1px solid #1a1a44; color:#88aaff; border-radius:6px;
+                         padding:.35rem .9rem; font-size:.82rem; text-decoration:none; }
+    .page-btn:hover    { background:#1a1a44; }
+    .page-btn-disabled { opacity:.35; pointer-events:none; }
+    /* accordion */
+    .mission-card      { cursor:pointer; }
+    .mission-card.open { border-color:#2a2a66; }
+    .mission-expand    { display:none; background:#0d0f18;
+                         border:1px solid #1a1a44; border-top:none;
+                         border-radius:0 0 10px 10px; margin-top:-2px; }
+    .mission-expand.open { display:block; }
+    .det-metric        { background:#111133; border:1px solid #1a1a44; border-radius:8px;
+                         padding:.75rem; text-align:center; }
+    .det-card          { background:#111133; border:1px solid #1a1a44; border-radius:8px; padding:1rem; }
+    .det-row           { display:flex; justify-content:space-between; align-items:center;
+                         padding:.45rem 0; border-bottom:1px solid #1a1a44; font-size:.85rem; color:#aaa; }
+    .pbar-track        { background:#1a1a44; border-radius:4px; height:5px; overflow:hidden; }
+    .pbar-fill         { height:100%; border-radius:4px; }
+    .expand-arrow      { transition:transform .2s; display:inline-block; color:#334; font-size:.85rem; flex-shrink:0; }
+    .mission-card.open .expand-arrow { transform:rotate(90deg); color:#88aaff; }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <div class="section-label">@(isAdmin ? "Administração" : "Centro de Controle")</div>
+        <h1 class="mb-0" style="font-size:1.5rem;font-weight:700;letter-spacing:.04em">
+            @(isAdmin ? "TODAS AS MISSÕES" : "HISTÓRICO DE MISSÕES")
+            @if (isAdmin)
+            {
+                <span style="font-size:.6rem;background:#441111;color:#ff4444;padding:.2rem .6rem;border-radius:4px;vertical-align:middle">ADMIN</span>
+            }
+        </h1>
+    </div>
+    <div class="mono" style="font-size:.75rem;color:#555">@statTotal missão(ões)</div>
+</div>
+
+@* ── KPI Row ── *@
+@if (!isAdmin)
+{
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="mission-kpi-card">
+            <div class="section-label">Total</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#88aaff">@statTotal</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="mission-kpi-card">
+            <div class="section-label">Taxa de Sucesso</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#3DD6C8">@((statRate * 100).ToString("F0"))%</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="mission-kpi-card">
+            <div class="section-label">Melhor Score</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#ffd700">@statBest</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="mission-kpi-card">
+            <div class="section-label">Falhas</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#C0392B">@statFailed</div>
+        </div>
+    </div>
+</div>
+}
+
+@* ── Search + Filters ── *@
+<form method="get" id="filterForm" class="mb-4">
+    <input type="hidden" name="page" value="1" />
+
+    @* Search bar *@
+    <div class="d-flex gap-2 mb-3">
+        <div style="position:relative;flex:1;max-width:400px">
+            <span style="position:absolute;left:.8rem;top:50%;transform:translateY(-50%);color:#555;pointer-events:none">🔍</span>
+            <input type="text" name="search" value="@(searchRaw ?? (destFilter is "ISS" or "LEO_GENERIC" or "SSO" ? "" : destFilter))"
+                   placeholder="Pesquisar destino (ex: ISS, SSO, LEO…)"
+                   autocomplete="off"
+                   style="width:100%;background:#0d0f18;border:1px solid #1a1a44;color:#e0e0ff;
+                          border-radius:8px;padding:.5rem .8rem .5rem 2.2rem;font-size:.88rem;outline:none"
+                   onfocus="this.style.borderColor='#4466ff'"
+                   onblur="this.style.borderColor='#1a1a44'" />
+        </div>
+        <button type="submit" class="btn btn-sm" style="background:#4466ff;color:#fff;border:none;border-radius:8px;padding:.5rem 1.2rem">
+            Buscar
+        </button>
+        @if (!string.IsNullOrEmpty(destFilter) || !string.IsNullOrEmpty(statusFilter))
+        {
+            <a asp-action="Index" class="btn btn-sm" style="background:#111133;border:1px solid #334;color:#666;border-radius:8px;padding:.5rem .9rem">
+                ✕ Limpar
+            </a>
+        }
+    </div>
+
+    @* Destino quick-filters *@
+    <div class="d-flex align-items-center gap-2 flex-wrap mb-2">
+        <span class="section-label me-1">Destino:</span>
+        <button type="submit" name="destination" value=""
+                class="chip @(string.IsNullOrEmpty(destFilter) ? "chip-active" : "chip-inactive")">
+            TODOS
+        </button>
+        <button type="submit" name="destination" value="ISS"
+                class="chip @(destFilter == "ISS" ? "chip-active" : "chip-inactive")"
+                style="@(destFilter == "ISS" ? "border-color:#88aaff;color:#88aaff" : "")">
+            🛸 ISS
+        </button>
+        <button type="submit" name="destination" value="LEO_GENERIC"
+                class="chip @(destFilter == "LEO_GENERIC" ? "chip-active" : "chip-inactive")"
+                style="@(destFilter == "LEO_GENERIC" ? "border-color:#3DD6C8;color:#3DD6C8" : "")">
+            🌍 LEO Genérica
+        </button>
+        <button type="submit" name="destination" value="SSO"
+                class="chip @(destFilter == "SSO" ? "chip-active" : "chip-inactive")"
+                style="@(destFilter == "SSO" ? "border-color:#ffd700;color:#ffd700" : "")">
+            ☀️ SSO
+        </button>
+    </div>
+
+    @* Status chips *@
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="section-label me-1">Status:</span>
+        <input type="hidden" name="destination" value="@destFilter" id="hiddenDest" />
+        <button type="submit" name="status" value=""
+                class="chip @(string.IsNullOrEmpty(statusFilter) ? "chip-active" : "chip-inactive")">
+            TODOS
+        </button>
+        <button type="submit" name="status" value="success"
+                class="chip @(statusFilter == "success" ? "chip-active" : "chip-inactive")"
+                style="@(statusFilter == "success" ? "border-color:#3DD6C8;color:#3DD6C8" : "")">
+            ✓ SUCESSO
+        </button>
+        <button type="submit" name="status" value="failure"
+                class="chip @(statusFilter == "failure" ? "chip-active" : "chip-inactive")"
+                style="@(statusFilter == "failure" ? "border-color:#C0392B;color:#C0392B" : "")">
+            ✗ FALHA
+        </button>
+        <button type="submit" name="status" value="aborted"
+                class="chip @(statusFilter == "aborted" ? "chip-active" : "chip-inactive")"
+                style="@(statusFilter == "aborted" ? "border-color:#D4A017;color:#D4A017" : "")">
+            − ABORTADO
+        </button>
+    </div>
+</form>
+
+@section Scripts {
+<script>
+// ── Accordion lazy fetch ──────────────────────────────────────────────────
+function toggleMission(card, id) {
+    const expand = document.getElementById('expand-' + id);
+    if (!expand) return;
+
+    const isOpen = card.classList.contains('open');
+
+    // fechar todos os outros
+    document.querySelectorAll('.mission-card.open').forEach(c => {
+        c.classList.remove('open');
+        const otherId = c.closest('.accordion-wrap').dataset.id;
+        const other   = document.getElementById('expand-' + otherId);
+        if (other) other.classList.remove('open');
+    });
+
+    if (isOpen) return; // era o mesmo, só fecha
+
+    card.classList.add('open');
+    expand.classList.add('open');
+
+    // já carregado — não refetch
+    if (expand.dataset.loaded) return;
+
+    fetch('/Missions/DetailsPartial/' + id, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+        .then(r => r.ok ? r.text() : Promise.reject(r.status))
+        .then(html => {
+            expand.innerHTML = html;
+            expand.dataset.loaded = '1';
+        })
+        .catch(() => {
+            expand.innerHTML = '<div style="padding:1rem;color:#ff6666;font-size:.82rem">Erro ao carregar detalhes.</div>';
+        });
+}
+
+// ── Manter estado do destino ao filtrar por status ────────────────────────
+document.querySelectorAll('button[name="status"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        document.getElementById('hiddenDest').value =
+            document.querySelector('input[name="search"]').value ||
+            '@destFilter';
+    });
+});
+document.querySelectorAll('button[name="destination"]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        // clear search box when quick-filter clicked
+        document.querySelector('input[name="search"]').value = '';
+    });
+});
+</script>
+}
+
+@* ── Mission List ── *@
+@if (!missions.Any())
+{
+    <div class="mission-kpi-card text-center py-5" style="color:#555">
+        <div style="font-size:2.5rem;margin-bottom:.5rem">🛸</div>
+        <div style="font-size:.9rem">Nenhuma missão encontrada para este filtro.</div>
+    </div>
+}
+else
+{
+    <div class="d-flex flex-column gap-2 mb-4">
+        @foreach (var m in missions)
+        {
+            var id    = m.TryGetProperty("id",                  out var idEl) ? idEl.GetString()  : null;
+            var dest  = m.TryGetProperty("destination_display", out var dEl)  ? dEl.GetString()   : "—";
+            var st    = m.TryGetProperty("status",              out var stEl) ? stEl.GetString()  : null;
+            var score = m.TryGetProperty("mission_score",       out var scEl) ? scEl.GetInt32()   : 0;
+            var risk  = m.TryGetProperty("risk_score",          out var rEl)  ? rEl.GetDouble()   : 0.0;
+            var date  = m.TryGetProperty("created_at",          out var dtEl) ? dtEl.GetString()  : null;
+            var pilot = m.TryGetProperty("user_display_name",   out var pEl)  ? pEl.GetString()   : null;
+            var color = StatusColor(st);
+            var safeId = id ?? "";
+            var canExpand = !string.IsNullOrEmpty(safeId);
+
+            <div class="accordion-wrap" data-id="@safeId">
+                <div class="mission-card expandable" onclick="toggleMission(this,'@safeId')">
+                    <div class="status-icon" style="background:@(color)22;color:@color">
+                        @StatusIcon(st)
+                    </div>
+                    <div style="flex:1;min-width:0">
+                        <div style="font-weight:600;font-size:.95rem;color:#e0e0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">
+                            @dest
+                        </div>
+                        <div class="mono" style="font-size:.72rem;color:#555;margin-top:.2rem">
+                            @if (isAdmin && pilot != null)
+                            {
+                                <span style="color:#88aaff">@pilot</span>
+                                <span> · </span>
+                            }
+                            @FormatDate(date)
+                        </div>
+                    </div>
+                    <div class="text-end" style="flex-shrink:0">
+                        <div class="mono" style="font-size:1.1rem;font-weight:700;color:#ffd700">@score <span style="font-size:.7rem;color:#555">pts</span></div>
+                        <div class="mono" style="font-size:.72rem;color:@RiskColor(risk)">Risco @((risk*100).ToString("F0"))%</div>
+                    </div>
+                    @if (canExpand)
+                    {
+                        <span class="expand-arrow">›</span>
+                    }
+                </div>
+                @if (canExpand)
+                {
+                    <div class="mission-expand" id="expand-@safeId">
+                        <div class="expand-loading" style="padding:1.5rem;text-align:center;color:#555;font-size:.82rem">
+                            Carregando…
+                        </div>
+                    </div>
+                }
+            </div>
+        }
+    </div>
+
+    @* ── Pagination ── *@
+    @if (totalPages > 1)
+    {
+        <div class="d-flex align-items-center gap-2 justify-content-center mt-2">
+            <a class="page-btn @(currentPage <= 1 ? "page-btn-disabled" : "")"
+               asp-action="Index" asp-route-page="@(currentPage - 1)"
+               asp-route-status="@statusFilter" asp-route-destination="@destFilter">
+                ← Anterior
+            </a>
+            <span class="mono" style="font-size:.8rem;color:#555">@currentPage / @totalPages</span>
+            <a class="page-btn @(currentPage >= totalPages ? "page-btn-disabled" : "")"
+               asp-action="Index" asp-route-page="@(currentPage + 1)"
+               asp-route-status="@statusFilter" asp-route-destination="@destFilter">
+                Próxima →
+            </a>
+        </div>
     }
 }

@@ -1,0 +1,161 @@
+@using System.Text.Json
+@{ Layout = null; }
+@{
+    var json = ViewBag.MissionJson is JsonElement j
+               && j.ValueKind != JsonValueKind.Undefined
+               ? (JsonElement?)((JsonElement)ViewBag.MissionJson) : null;
+
+    string G(string key, string fb = "—")
+        => json.HasValue && json.Value.TryGetProperty(key, out var el) ? (el.GetString() ?? fb) : fb;
+    int GInt(string key)
+        => json.HasValue && json.Value.TryGetProperty(key, out var el) ? el.GetInt32() : 0;
+    double GDbl(string key)
+        => json.HasValue && json.Value.TryGetProperty(key, out var el) ? el.GetDouble() : 0.0;
+
+    var status  = G("status");
+    var dest    = G("destination_display");
+    var score   = GInt("mission_score");
+    var risk    = GDbl("risk_score");
+    var dv      = GDbl("delta_v_km_s");
+    var depTime = G("departure_time");
+    var arrTime = G("arrival_time");
+    var created = G("created_at");
+
+    var obstacles = new List<JsonElement>();
+    if (json.HasValue && json.Value.TryGetProperty("obstacles", out var obs))
+        foreach (var o in obs.EnumerateArray()) obstacles.Add(o);
+
+    int effScore = 0, safScore = 0;
+    if (json.HasValue && json.Value.TryGetProperty("score_breakdown", out var sb))
+    {
+        if (sb.TryGetProperty("efficiency_score", out var e)) effScore = e.GetInt32();
+        if (sb.TryGetProperty("safety_score",     out var s)) safScore = s.GetInt32();
+    }
+
+    string SC() => status switch {
+        "success" => "#3DD6C8", "failure" => "#C0392B", "aborted" => "#D4A017", _ => "#88aaff"
+    };
+    string SL() => status switch {
+        "success" => "MISSÃO CONCLUÍDA", "failure" => "MISSÃO FALHOU",
+        "aborted" => "MISSÃO ABORTADA",  _ => status.ToUpper()
+    };
+    string RC(double r) => r >= 0.7 ? "#C0392B" : r >= 0.4 ? "#D4A017" : "#3DD6C8";
+    string RL(double r) => r >= 0.7 ? "CRÍTICO" : r >= 0.4 ? "MÉDIO" : "BAIXO";
+    string FD(string iso) {
+        if (DateTime.TryParse(iso, out var dt)) return dt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+        return iso;
+    }
+    string RLC(string? l) => l?.ToLower() switch {
+        "critical" => "#C0392B", "high" => "#E8621A", "medium" => "#D4A017", _ => "#3DD6C8"
+    };
+}
+
+<div style="padding:1rem 1.2rem 1.2rem;border-top:1px solid #1a1a44">
+
+    @* 4 métricas *@
+    <div class="row g-2 mb-3">
+        <div class="col-6 col-md-3">
+            <div class="det-metric">
+                <div class="section-label">Score</div>
+                <div class="mono" style="font-size:1.4rem;font-weight:700;color:#ffd700">@score</div>
+                <div style="font-size:.7rem;color:#555">pts</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="det-metric">
+                <div class="section-label">Risco</div>
+                <div class="mono" style="font-size:1.4rem;font-weight:700;color:@RC(risk)">@((risk*100).ToString("F0"))%</div>
+                <div style="font-size:.7rem;color:@RC(risk)">@RL(risk)</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="det-metric">
+                <div class="section-label">Delta-V</div>
+                <div class="mono" style="font-size:1.4rem;font-weight:700;color:#88aaff">@dv.ToString("F2")</div>
+                <div style="font-size:.7rem;color:#555">km/s</div>
+            </div>
+        </div>
+        <div class="col-6 col-md-3">
+            <div class="det-metric">
+                <div class="section-label">Obstáculos</div>
+                <div class="mono" style="font-size:1.4rem;font-weight:700;color:#E8621A">@obstacles.Count</div>
+                <div style="font-size:.7rem;color:#555">encontrados</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row g-2 mb-3">
+        @* Score breakdown *@
+        <div class="col-md-5">
+            <div class="det-card">
+                <div class="section-label mb-2">Composição do Score</div>
+                <div class="d-flex justify-content-between" style="font-size:.8rem;margin-bottom:.3rem">
+                    <span style="color:#aaa">Eficiência</span>
+                    <span class="mono" style="color:#88aaff">@effScore</span>
+                </div>
+                <div class="pbar-track mb-2">
+                    <div class="pbar-fill" style="width:@(score>0?(effScore*100/Math.Max(score,1)):0)%;background:#4466ff"></div>
+                </div>
+                <div class="d-flex justify-content-between" style="font-size:.8rem;margin-bottom:.3rem">
+                    <span style="color:#aaa">Segurança</span>
+                    <span class="mono" style="color:#3DD6C8">@safScore</span>
+                </div>
+                <div class="pbar-track mb-2">
+                    <div class="pbar-fill" style="width:@(score>0?(safScore*100/Math.Max(score,1)):0)%;background:#3DD6C8"></div>
+                </div>
+                <div style="border-top:1px solid #1a1a44;padding-top:.6rem;display:flex;justify-content:space-between">
+                    <span style="font-size:.8rem;color:#555">Total</span>
+                    <span class="mono" style="color:#ffd700;font-weight:700">@score pts</span>
+                </div>
+            </div>
+        </div>
+
+        @* Info *@
+        <div class="col-md-7">
+            <div class="det-card">
+                <div class="section-label mb-2">Informações da Missão</div>
+                <div class="det-row"><span>Destino</span><span style="font-weight:600">@dest</span></div>
+                <div class="det-row">
+                    <span>Status</span>
+                    <span class="mono" style="color:@SC();font-size:.78rem;font-weight:600">@SL()</span>
+                </div>
+                <div class="det-row"><span>Partida</span><span class="mono" style="font-size:.8rem;color:#aaa">@FD(depTime)</span></div>
+                <div class="det-row"><span>Chegada</span><span class="mono" style="font-size:.8rem;color:#aaa">@FD(arrTime)</span></div>
+                <div class="det-row" style="border-bottom:none">
+                    <span>Registrado</span>
+                    <span class="mono" style="font-size:.78rem;color:#555">@FD(created)</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    @* Obstáculos *@
+    @if (obstacles.Any())
+    {
+        <div class="det-card">
+            <div class="section-label mb-2">Obstáculos Encontrados (@obstacles.Count)</div>
+            @foreach (var o in obstacles)
+            {
+                var name = o.TryGetProperty("debris_name",              out var nEl)  ? nEl.GetString()  : "Desconhecido";
+                var dist = o.TryGetProperty("closest_approach_km",      out var dEl)  ? dEl.GetDouble()  : 0.0;
+                var rl   = o.TryGetProperty("risk_level",               out var rlEl) ? rlEl.GetString() : "low";
+                var tca  = o.TryGetProperty("time_of_closest_approach", out var tEl)  ? tEl.GetString()  : null;
+                <div style="display:flex;align-items:center;gap:.75rem;padding:.5rem 0;
+                            border-bottom:1px solid #0f0f22;font-size:.82rem">
+                    <div style="width:7px;height:7px;border-radius:50%;background:@RLC(rl);flex-shrink:0"></div>
+                    <div style="flex:1;min-width:0">
+                        <div class="mono" style="color:#e0e0ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">@name</div>
+                        @if (tca != null)
+                        {
+                            <div class="mono" style="font-size:.7rem;color:#555">TCA: @FD(tca)</div>
+                        }
+                    </div>
+                    <div style="text-align:right;flex-shrink:0">
+                        <div class="mono" style="color:@RLC(rl);font-weight:600">@dist.ToString("F1") km</div>
+                        <div style="font-size:.68rem;color:#555;text-transform:uppercase">@rl</div>
+                    </div>
+                </div>
+            }
+        </div>
+    }
+</div>
