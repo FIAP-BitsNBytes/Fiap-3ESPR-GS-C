@@ -197,6 +197,35 @@ Contrato completo com exemplos de request/response: [`docs/API_CONTRACT.md`](doc
 
 ---
 
+## Usuários de Demonstração
+
+O seeder cria automaticamente dois usuários na primeira execução da API.
+Nenhuma configuração manual necessária — basta rodar e logar.
+
+| Usuário | E-mail | Senha | Role |
+|---|---|---|---|
+| Piloto Demo | `demo@missionclear.app` | `Demo@123456` | Researcher |
+| Administrador | `admin@missionclear.app` | `Admin@123456` | Administrator |
+
+O usuário **Piloto Demo** já vem com **15 missões simuladas** no histórico (ISS, LEO Genérica e SSO — últimos 28 dias), prontas para visualização no web e no app mobile.
+
+### Matriz de Permissões
+
+| Recurso | Researcher | Administrator |
+|---|---|---|
+| Dashboard orbital (`GET /api/dashboard/*`) | ✓ Público | ✓ |
+| Detritos e janelas de lançamento | ✓ Público | ✓ |
+| Simular missão (`POST /api/mission/*`) | ✓ Público | ✓ |
+| Ver histórico próprio (`GET /api/missions`) | ✓ Autenticado | ✓ |
+| Ver estatísticas próprias (`GET /api/missions/stats`) | ✓ Autenticado | ✓ |
+| Ver perfil próprio (`GET /api/users/me`) | ✓ Autenticado | ✓ |
+| **Deletar missão** (`DELETE /api/missions/{id}`) | ✗ 403 | ✓ |
+| **Gerenciar usuários** (web `/Users`) | ✗ 403 | ✓ |
+
+> Novos cadastros via `POST /api/auth/register` recebem role `Researcher` por padrão.
+
+---
+
 ## Como Rodar
 
 ### Pré-requisitos
