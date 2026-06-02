@@ -43,4 +43,26 @@ public sealed class UsersController(IUserService userService) : BaseApiControlle
         var favorites = await userService.UpdateFavoritesAsync(CurrentUserId, request, ct);
         return Ok(favorites);
     }
+
+    // GET api/users/me/favorites/debris?type=satellite&sort=altitude_asc
+    [HttpGet("me/favorites/debris")]
+    public async Task<IActionResult> GetFavoriteDebrisFiltered(
+        [FromQuery] string? type,
+        [FromQuery] string  sort = "altitude_asc",
+        CancellationToken   ct   = default)
+    {
+        var result = await userService.GetFavoriteDebrisFilteredAsync(CurrentUserId, type, sort, ct);
+        return Ok(result);
+    }
+
+    // GET api/users/me/favorites/windows?destination=ISS&sort=saved_at_desc
+    [HttpGet("me/favorites/windows")]
+    public async Task<IActionResult> GetFavoriteWindowsFiltered(
+        [FromQuery] string? destination,
+        [FromQuery] string  sort = "saved_at_desc",
+        CancellationToken   ct   = default)
+    {
+        var result = await userService.GetFavoriteWindowsFilteredAsync(CurrentUserId, destination, sort, ct);
+        return Ok(result);
+    }
 }
