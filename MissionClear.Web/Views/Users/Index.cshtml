@@ -1,13 +1,161 @@
-@{ ViewData["Title"] = "Gerenciar Usuários"; }
+@using System.Text.Json
+@{ ViewData["Title"] = "Usuários"; }
 
-<h1>
-    Gerenciar Usuários
-    <span class="badge badge-admin" style="font-size:.6rem;vertical-align:middle">ADMIN</span>
-</h1>
-<div class="card">
-    <p>@ViewBag.Message</p>
-    <p style="color:#aaa">
-        Área reservada para Administradores. Gestão completa de usuários disponível
-        quando o endpoint <code>/api/admin/users</code> for implementado.
-    </p>
+@{
+    var usersEl = ViewBag.UsersJson is JsonElement uj && uj.ValueKind != JsonValueKind.Undefined
+                  ? (JsonElement?)((JsonElement)ViewBag.UsersJson) : null;
+
+    var users = new List<JsonElement>();
+    int total = 0;
+    if (usersEl.HasValue)
+    {
+        if (usersEl.Value.TryGetProperty("total", out var tc)) total = tc.GetInt32();
+        if (usersEl.Value.TryGetProperty("data",  out var ud))
+            foreach (var u in ud.EnumerateArray()) users.Add(u);
+    }
+
+    string S(JsonElement el, string key, string fb = "—") =>
+        el.TryGetProperty(key, out var v) ? (v.GetString() ?? fb) : fb;
+    int I(JsonElement el, string key) =>
+        el.TryGetProperty(key, out var v) ? v.GetInt32() : 0;
+    string RoleColor(string? r) => r == "Administrator" ? "#ffd700" : "#88aaff";
+    string FormatDate(string? iso) {
+        if (DateTime.TryParse(iso, out var dt)) return dt.ToLocalTime().ToString("dd/MM/yyyy HH:mm");
+        return iso ?? "—";
+    }
+}
+
+<style>
+    .admin-card  { background:#111133; border:1px solid #1a1a44; border-radius:10px; padding:1.4rem; }
+    .kpi-card    { background:#111133; border:1px solid #1a1a44; border-radius:10px; padding:1rem; }
+    .section-label { font-size:.72rem; color:#555; text-transform:uppercase; letter-spacing:.08em; }
+    .mono        { font-family:'JetBrains Mono','Courier New',monospace; }
+    .adm-table   { width:100%; border-collapse:collapse; font-size:.84rem; }
+    .adm-table th{ color:#555; font-size:.68rem; text-transform:uppercase; letter-spacing:.07em;
+                   padding:.55rem .8rem; border-bottom:1px solid #1a1a44; text-align:left; font-weight:600; }
+    .adm-table td{ padding:.65rem .8rem; border-bottom:1px solid #0f0f22; vertical-align:middle; color:#e0e0ff; }
+    .adm-table tr:last-child td { border-bottom:none; }
+    .adm-table tr:hover td { background:#141430; }
+    .role-badge  { display:inline-block; padding:.15rem .65rem; border-radius:20px; font-size:.68rem;
+                   font-weight:600; letter-spacing:.05em; }
+    .btn-action  { border:none; border-radius:6px; padding:.3rem .75rem; font-size:.75rem;
+                   font-weight:600; cursor:pointer; letter-spacing:.03em; }
+</style>
+
+<div class="d-flex align-items-center justify-content-between mb-4">
+    <div>
+        <div class="section-label">Administração</div>
+        <h1 class="mb-0" style="font-size:1.5rem;font-weight:700;letter-spacing:.04em">
+            USUÁRIOS
+            <span style="font-size:.6rem;background:#441111;color:#ff4444;padding:.2rem .6rem;border-radius:4px;vertical-align:middle">ADMIN</span>
+        </h1>
+    </div>
+    <div class="mono" style="font-size:.75rem;color:#555">@total usuário(s)</div>
+</div>
+
+@* KPIs *@
+<div class="row g-3 mb-4">
+    <div class="col-6 col-md-3">
+        <div class="kpi-card">
+            <div class="section-label">Total</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#88aaff">@total</div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card">
+            <div class="section-label">Administrators</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#ffd700">
+                @users.Count(u => S(u, "role") == "Administrator")
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card">
+            <div class="section-label">Researchers</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#88aaff">
+                @users.Count(u => S(u, "role") == "Researcher")
+            </div>
+        </div>
+    </div>
+    <div class="col-6 col-md-3">
+        <div class="kpi-card">
+            <div class="section-label">Missões Totais</div>
+            <div class="mono" style="font-size:1.8rem;font-weight:700;color:#3DD6C8">
+                @users.Sum(u => I(u, "total_missions"))
+            </div>
+        </div>
+    </div>
+</div>
+
+@* Tabela *@
+<div class="admin-card">
+    @if (!users.Any())
+    {
+        <div style="color:#555;text-align:center;padding:2rem">Nenhum usuário encontrado.</div>
+    }
+    else
+    {
+        <div style="overflow-x:auto">
+            <table class="adm-table">
+                <thead>
+                    <tr>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Role</th>
+                        <th>Missões</th>
+                        <th>Desde</th>
+                        <th style="text-align:right">Ações</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @foreach (var u in users)
+                    {
+                        var uid  = S(u, "id");
+                        var role = S(u, "role");
+                        var isSelf = uid.Replace("usr_","") == User.FindFirst("sub")?.Value?.Replace("-","")
+                                  || uid.Replace("usr_","") == User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value?.Replace("-","");
+                        <tr>
+                            <td style="font-weight:600">@S(u, "display_name")</td>
+                            <td class="mono" style="color:#555;font-size:.78rem">@S(u, "email")</td>
+                            <td>
+                                <span class="role-badge"
+                                      style="background:@(RoleColor(role))1a;color:@RoleColor(role);border:1px solid @(RoleColor(role))44">
+                                    @role.ToUpper()
+                                </span>
+                            </td>
+                            <td class="mono" style="color:#ffd700;font-weight:600">@I(u, "total_missions")</td>
+                            <td class="mono" style="color:#555;font-size:.78rem">@FormatDate(S(u, "created_at"))</td>
+                            <td style="text-align:right">
+                                @if (!isSelf)
+                                {
+                                    @* Trocar role *@
+                                    <form asp-action="ChangeRole" method="post" class="d-inline me-1">
+                                        <input type="hidden" name="id"   value="@uid" />
+                                        <input type="hidden" name="role" value="@(role == "Administrator" ? "Researcher" : "Administrator")" />
+                                        <button type="submit" class="btn-action"
+                                                style="background:#1a1a44;color:#88aaff"
+                                                title="@(role == "Administrator" ? "Rebaixar para Researcher" : "Promover a Administrator")">
+                                            @(role == "Administrator" ? "↓ Researcher" : "↑ Admin")
+                                        </button>
+                                    </form>
+                                    @* Excluir *@
+                                    <form asp-action="Delete" method="post" class="d-inline"
+                                          onsubmit="return confirm('Excluir @S(u, "display_name")? Esta ação apaga todas as missões do usuário.')">
+                                        <input type="hidden" name="id" value="@uid" />
+                                        <button type="submit" class="btn-action" style="background:#2a0a0a;color:#ff6666">
+                                            Excluir
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <span class="mono" style="font-size:.7rem;color:#334">você</span>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </tbody>
+            </table>
+        </div>
+    }
 </div>
