@@ -23,6 +23,15 @@ public sealed class FavoritesRepository(AppDbContext context) : IFavoritesReposi
             .ToListAsync(ct);
     }
 
+    public async Task<IReadOnlyList<UserSavedWindowEntity>> GetWindowsFilteredAsync(
+        Guid userId, string? destination, CancellationToken ct = default)
+    {
+        var query = context.SavedWindows.Where(w => w.UserId == userId);
+        if (!string.IsNullOrWhiteSpace(destination))
+            query = query.Where(w => w.Destination == destination);
+        return await query.OrderByDescending(w => w.SavedAt).ToListAsync(ct);
+    }
+
     public async Task ReplaceDebrisAsync(
         Guid userId, IEnumerable<string> debrisIds, CancellationToken ct = default)
     {
