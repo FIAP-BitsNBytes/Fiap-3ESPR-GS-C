@@ -13,8 +13,36 @@ namespace MissionClear.Api.Controllers;
 public sealed class AdminController(
     IUserRepository userRepo,
     IMissionRepository missionRepo,
-    IMissionHistoryService historyService) : BaseApiController
+    IMissionHistoryService historyService,
+    IDataAggregatorService aggregatorService,
+    IOrbitalCache orbitalCache) : BaseApiController
 {
+    // POST api/admin/refresh — force TLE re-fetch from CelesTrak
+    [HttpPost("refresh")]
+    public async Task<IActionResult> Refresh(CancellationToken ct)
+    {
+        try
+        {
+            await aggregatorService.FetchAndMergeAsync(ct);
+        }
+        catch (DomainException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            throw new DomainException("CACHE_NOT_READY",
+                $"Orbital cache refresh failed: {ex.Message}", 503);
+        }
+
+        return Ok(new
+        {
+            objects_in_cache = orbitalCache.Count,
+            last_fetch       = orbitalCache.LastFetch?.ToString("O") ?? DateTime.UtcNow.ToString("O"),
+            message          = $"Refresh complete — {orbitalCache.Count} objects in cache.",
+        });
+    }
+
     // GET api/admin/users — todos os usuários + missão count (1 query só)
     [HttpGet("users")]
     public async Task<IActionResult> GetUsers(CancellationToken ct)
