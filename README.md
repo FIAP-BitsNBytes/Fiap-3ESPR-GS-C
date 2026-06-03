@@ -2,13 +2,13 @@
 
 > Projeto acadêmico — FIAP 3ESPR · Global Solution 2026
 
-| Integrante                | RM        |
-| ------------------------- | --------- |
-| Gustavo Bezerra Assumção  | RM 553076 |
+| Integrante                 | RM        |
+| -------------------------- | --------- |
+| Gustavo Bezerra Assumção | RM 553076 |
 | Jó Sales                  | RM 552679 |
-| Miguel Garcez de Carvalho | RM 553768 |
-| Vinicius Souza e Silva    | RM 552781 |
-| Edson Leonardo            | RM 553737 |
+| Miguel Garcez de Carvalho  | RM 553768 |
+| Vinicius Souza e Silva     | RM 552781 |
+| Edson Leonardo             | RM 553737 |
 
 ---
 
@@ -41,13 +41,13 @@ O app mobile (React Native / Expo) está em `Fiap-3ESPR-GS-Mobile`.
 | Runtime              | .NET 10.0                               |
 | Orquestrador         | .NET Aspire 9.1                         |
 | API                  | ASP.NET Core (controllers)              |
-| Banco de dados       | MySQL 8 · Pomelo EF Core · Migrations   |
+| Banco de dados       | MySQL 8 · Pomelo EF Core · Migrations |
 | Auth                 | JWT Bearer (1h) + Refresh Token (7d)    |
 | Hash de senhas       | BCrypt.Net-Next                         |
-| Propagação orbital   | SGP4 via NuGet (nunca reimplementado)   |
-| Serialização JSON    | System.Text.Json · `snake_case`         |
-| Testes               | xUnit · FluentAssertions · Moq          |
-| Observabilidade      | OpenTelemetry · Aspire Dashboard        |
+| Propagação orbital | SGP4 via NuGet (nunca reimplementado)   |
+| Serialização JSON  | System.Text.Json ·`snake_case`       |
+| Testes               | xUnit · FluentAssertions · Moq        |
+| Observabilidade      | OpenTelemetry · Aspire Dashboard       |
 
 ---
 
@@ -72,6 +72,7 @@ MissionClear.sln
 ```
 
 **Regra de DI:**
+
 - `IOrbitalEngineService` → `AddSingleton` (compartilha estado com `IOrbitalCache`)
 - Repositories e demais services → `AddScoped`
 
@@ -96,6 +97,7 @@ Os TLEs são carregados no `OrbitalCache` (singleton). Enquanto carrega, `GET /a
 ### 3. Detecção de Conjunções
 
 `ConjunctionDetector` analisa a trajetória de uma missão proposta e identifica detritos que passam a menos de 200 km da rota. Para cada aproximação calcula:
+
 - `closest_approach_km` — distância mínima prevista
 - `time_of_closest_approach` — instante de máxima aproximação
 - `risk_level` — `low` / `medium` / `high` / `critical`
@@ -106,19 +108,19 @@ Os TLEs são carregados no `OrbitalCache` (singleton). Enquanto carrega, `GET /a
 
 ### 5. Simulação de Missão
 
-| Modo | Endpoint | Comportamento |
-|---|---|---|
-| Estática | `POST /api/mission/simulate` | Resultado imediato, sem stream |
+| Modo      | Endpoint                            | Comportamento                    |
+| --------- | ----------------------------------- | -------------------------------- |
+| Estática | `POST /api/mission/simulate`      | Resultado imediato, sem stream   |
 | Dinâmica | `POST /api/mission/session` + SSE | Sessão com stream em tempo real |
 
 **Eventos SSE emitidos:**
 
-| Evento | Frequência | Conteúdo |
-|---|---|---|
-| `heartbeat` | 15s | Mantém conexão viva |
-| `debris_update` | 30s | Posições atualizadas dos debris próximos |
-| `conjunction_alert` | Sob demanda | Debris entrou na zona de risco (<200km) |
-| `session_complete` | 1x ao fim | Score final, risk_score, delta-v |
+| Evento                | Frequência | Conteúdo                                   |
+| --------------------- | ----------- | ------------------------------------------- |
+| `heartbeat`         | 15s         | Mantém conexão viva                       |
+| `debris_update`     | 30s         | Posições atualizadas dos debris próximos |
+| `conjunction_alert` | Sob demanda | Debris entrou na zona de risco (<200km)     |
+| `session_complete`  | 1x ao fim   | Score final, risk_score, delta-v            |
 
 ### 6. Autenticação JWT
 
@@ -132,51 +134,51 @@ Os TLEs são carregados no `OrbitalCache` (singleton). Enquanto carrega, `GET /a
 
 ### Orbital (público)
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/api/status` | Estado da API e contagem de TLEs |
-| `GET` | `/api/destinations` | Destinos de missão disponíveis |
-| `GET` | `/api/debris` | Detritos com posição atual propagada via SGP4 |
-| `GET` | `/api/debris/stats` | Estatísticas por tipo e faixa de altitude |
-| `GET` | `/api/debris/{id}` | Detalhe + TLE + órbita de um objeto (NORAD ID) |
-| `GET` | `/api/launch-windows` | Janelas de lançamento em slots de 15 min |
-| `GET` | `/api/launch-windows/best` | N melhores janelas por menor risk_score |
+| Método | Rota                         | Descrição                                     |
+| ------- | ---------------------------- | ----------------------------------------------- |
+| `GET` | `/api/status`              | Estado da API e contagem de TLEs                |
+| `GET` | `/api/destinations`        | Destinos de missão disponíveis                |
+| `GET` | `/api/debris`              | Detritos com posição atual propagada via SGP4 |
+| `GET` | `/api/debris/stats`        | Estatísticas por tipo e faixa de altitude      |
+| `GET` | `/api/debris/{id}`         | Detalhe + TLE + órbita de um objeto (NORAD ID) |
+| `GET` | `/api/launch-windows`      | Janelas de lançamento em slots de 15 min       |
+| `GET` | `/api/launch-windows/best` | N melhores janelas por menor risk_score         |
 
 ### Simulação (público)
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/api/mission/simulate` | Simulação estática — resultado imediato |
-| `POST` | `/api/mission/session` | Cria sessão de simulação dinâmica |
-| `GET` | `/api/mission/session/{id}/stream` | Stream SSE da simulação |
+| Método  | Rota                                   | Descrição                                          |
+| -------- | -------------------------------------- | ---------------------------------------------------- |
+| `POST` | `/api/mission/simulate`              | Simulação estática — resultado imediato          |
+| `POST` | `/api/mission/session`               | Cria sessão de simulação dinâmica                |
+| `GET`  | `/api/mission/session/{id}/stream`   | Stream SSE da simulação                            |
 | `POST` | `/api/mission/session/{id}/complete` | Finaliza sessão; salva no histórico se autenticado |
 
 ### Autenticação
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `POST` | `/api/auth/register` | Cria conta — role padrão: `Researcher` |
-| `POST` | `/api/auth/login` | Autentica · retorna access + refresh token |
-| `POST` | `/api/auth/refresh` | Renova access token |
-| `POST` | `/api/auth/logout` | Invalida refresh token |
+| Método  | Rota                   | Descrição                                 |
+| -------- | ---------------------- | ------------------------------------------- |
+| `POST` | `/api/auth/register` | Cria conta — role padrão:`Researcher`   |
+| `POST` | `/api/auth/login`    | Autentica · retorna access + refresh token |
+| `POST` | `/api/auth/refresh`  | Renova access token                         |
+| `POST` | `/api/auth/logout`   | Invalida refresh token                      |
 
 ### Usuário e Histórico (autenticado)
 
-| Método | Rota | Descrição |
-|---|---|---|
-| `GET` | `/api/users/me` | Perfil e stats do usuário |
-| `PUT` | `/api/users/me` | Atualiza display_name ou senha |
-| `GET` | `/api/missions` | Histórico paginado com filtros |
-| `GET` | `/api/missions/{id}` | Detalhe completo com score breakdown |
-| `GET` | `/api/missions/stats` | Estatísticas agregadas |
-| `DELETE` | `/api/missions/{id}` | Remove missão do histórico |
+| Método    | Rota                    | Descrição                          |
+| ---------- | ----------------------- | ------------------------------------ |
+| `GET`    | `/api/users/me`       | Perfil e stats do usuário           |
+| `PUT`    | `/api/users/me`       | Atualiza display_name ou senha       |
+| `GET`    | `/api/missions`       | Histórico paginado com filtros      |
+| `GET`    | `/api/missions/{id}`  | Detalhe completo com score breakdown |
+| `GET`    | `/api/missions/stats` | Estatísticas agregadas              |
+| `DELETE` | `/api/missions/{id}`  | Remove missão do histórico         |
 
 ### Dashboard
 
-| Método | Rota | Auth | Descrição |
-|---|---|---|---|
+| Método | Rota                       | Auth     | Descrição                                                      |
+| ------- | -------------------------- | -------- | ---------------------------------------------------------------- |
 | `GET` | `/api/dashboard/summary` | Opcional | Visão orbital; enriquecida com dados do usuário se autenticado |
-| `GET` | `/api/dashboard/alerts` | Público | Alertas de conjunção ativos nas próximas N horas |
+| `GET` | `/api/dashboard/alerts`  | Público | Alertas de conjunção ativos nas próximas N horas              |
 
 Contrato completo com exemplos de request/response: [`docs/API_CONTRACT.md`](docs/API_CONTRACT.md)
 
@@ -184,16 +186,16 @@ Contrato completo com exemplos de request/response: [`docs/API_CONTRACT.md`](doc
 
 ## Requisitos Atendidos
 
-| Requisito | Implementação |
-|---|---|
-| API REST funcional | 23 endpoints conforme `docs/API_CONTRACT.md` |
-| Dados reais de detritos | CelesTrak via `HttpClient` — sem mock hardcoded |
-| SGP4 para propagação | Biblioteca NuGet — `OrbitalEngineService` |
-| Auth JWT Bearer com roles | `AuthController` + `JwtService` + `[Authorize(Roles="...")]` |
-| Banco relacional + migrations | MySQL 8 · Pomelo EF Core · `dotnet ef migrations` |
-| Testes ≥ 80% nos Services | xUnit · `MissionClear.Tests` |
-| Documentação da API | `docs/API_CONTRACT.md` v2.2 |
-| Evidência de execução | Aspire Dashboard (`http://localhost:15021`) |
+| Requisito                     | Implementação                                                    |
+| ----------------------------- | ------------------------------------------------------------------ |
+| API REST funcional            | 23 endpoints conforme `docs/API_CONTRACT.md`                     |
+| Dados reais de detritos       | CelesTrak via `HttpClient` — sem mock hardcoded                 |
+| SGP4 para propagação        | Biblioteca NuGet —`OrbitalEngineService`                        |
+| Auth JWT Bearer com roles     | `AuthController` + `JwtService` + `[Authorize(Roles="...")]` |
+| Banco relacional + migrations | MySQL 8 · Pomelo EF Core ·`dotnet ef migrations`               |
+| Testes ≥ 80% nos Services    | xUnit ·`MissionClear.Tests`                                     |
+| Documentação da API         | `docs/API_CONTRACT.md` v2.2                                      |
+| Evidência de execução      | Aspire Dashboard (`http://localhost:15021`)                      |
 
 ---
 
@@ -202,25 +204,25 @@ Contrato completo com exemplos de request/response: [`docs/API_CONTRACT.md`](doc
 O seeder cria automaticamente dois usuários na primeira execução da API.
 Nenhuma configuração manual necessária — basta rodar e logar.
 
-| Usuário | E-mail | Senha | Role |
-|---|---|---|---|
-| Piloto Demo | `demo@missionclear.app` | `Demo@123456` | Researcher |
+| Usuário      | E-mail                     | Senha            | Role          |
+| ------------- | -------------------------- | ---------------- | ------------- |
+| Piloto Demo   |  `demo@missionclear.app` | `Demo@123456`  | Researcher    |
 | Administrador | `admin@missionclear.app` | `Admin@123456` | Administrator |
 
 O usuário **Piloto Demo** já vem com **15 missões simuladas** no histórico (ISS, LEO Genérica e SSO — últimos 28 dias), prontas para visualização no web e no app mobile.
 
 ### Matriz de Permissões
 
-| Recurso | Researcher | Administrator |
-|---|---|---|
-| Dashboard orbital (`GET /api/dashboard/*`) | ✓ Público | ✓ |
-| Detritos e janelas de lançamento | ✓ Público | ✓ |
-| Simular missão (`POST /api/mission/*`) | ✓ Público | ✓ |
-| Ver histórico próprio (`GET /api/missions`) | ✓ Autenticado | ✓ |
-| Ver estatísticas próprias (`GET /api/missions/stats`) | ✓ Autenticado | ✓ |
-| Ver perfil próprio (`GET /api/users/me`) | ✓ Autenticado | ✓ |
-| **Deletar missão** (`DELETE /api/missions/{id}`) | ✗ 403 | ✓ |
-| **Gerenciar usuários** (web `/Users`) | ✗ 403 | ✓ |
+| Recurso                                                   | Researcher     | Administrator |
+| --------------------------------------------------------- | -------------- | ------------- |
+| Dashboard orbital (`GET /api/dashboard/*`)              | ✓ Público    | ✓            |
+| Detritos e janelas de lançamento                         | ✓ Público    | ✓            |
+| Simular missão (`POST /api/mission/*`)                 | ✓ Público    | ✓            |
+| Ver histórico próprio (`GET /api/missions`)           | ✓ Autenticado | ✓            |
+| Ver estatísticas próprias (`GET /api/missions/stats`) | ✓ Autenticado | ✓            |
+| Ver perfil próprio (`GET /api/users/me`)               | ✓ Autenticado | ✓            |
+| **Deletar missão** (`DELETE /api/missions/{id}`) | ✗ 403         | ✓            |
+| **Gerenciar usuários** (web `/Users`)            | ✗ 403         | ✓            |
 
 > Novos cadastros via `POST /api/auth/register` recebem role `Researcher` por padrão.
 
@@ -283,20 +285,20 @@ dotnet test
 
 ## Destinos de Missão (MVP)
 
-| ID | Destino | Altitude | Inclinação | Delta-v |
-|---|---|---|---|---|
-| `ISS` | Estação Espacial Internacional | 408 km | 51.6° | 9,40 km/s |
-| `LEO_GENERIC` | Órbita LEO Genérica | 400 km | 28.5° | 9,20 km/s |
-| `SSO` | Sun-Synchronous Orbit | 500 km | 97.4° | 10,10 km/s |
+| ID              | Destino                          | Altitude | Inclinação | Delta-v    |
+| --------------- | -------------------------------- | -------- | ------------ | ---------- |
+| `ISS`         | Estação Espacial Internacional | 408 km   | 51.6°       | 9,40 km/s  |
+| `LEO_GENERIC` | Órbita LEO Genérica            | 400 km   | 28.5°       | 9,20 km/s  |
+| `SSO`         | Sun-Synchronous Orbit            | 500 km   | 97.4°       | 10,10 km/s |
 
 ---
 
 ## Convenções
 
-| Item | Formato |
-|---|---|
-| IDs | `{prefixo}_{Guid:N}` ex: `usr_a80ca0a15f2b4d3e8c91b2e7f3a4d5c6` |
-| Timestamps | ISO 8601 UTC com `Z` |
-| JSON | `snake_case` em todos os campos |
-| Erros | Envelope único `{ error, message, timestamp }` |
-| Commits | `feat \| fix \| refactor \| docs \| test \| chore: descrição` |
+| Item       | Formato                                                             |
+| ---------- | ------------------------------------------------------------------- |
+| IDs        | `{prefixo}_{Guid:N}` ex: `usr_a80ca0a15f2b4d3e8c91b2e7f3a4d5c6` |
+| Timestamps | ISO 8601 UTC com `Z`                                              |
+| JSON       | `snake_case` em todos os campos                                   |
+| Erros      | Envelope único `{ error, message, timestamp }`                   |
+| Commits    | `feat \| fix \| refactor \| docs \| test \| chore: descrição`        |
