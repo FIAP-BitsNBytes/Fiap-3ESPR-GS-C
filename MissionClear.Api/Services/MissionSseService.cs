@@ -29,10 +29,10 @@ public sealed class MissionSseService(
         var debrisMap = debris.ToDictionary(d => d.Id);
         var alerted   = new HashSet<string>();
 
-        // Simulation always runs to completion (5.5s) regardless of client disconnect.
+        // Simulation always runs to completion (~2.5 min, 51 ticks × 3 s) regardless of client disconnect.
         // Task.Delay does NOT pass ct — a mid-loop disconnect must not abort the loop.
         // SendEvent is wrapped so write failures don't stop the loop either.
-        for (int i = 0; i <= 100; i += 10)
+        for (int i = 0; i <= 100; i += 2)
         {
             // ── heartbeat ────────────────────────────────────────────────────
             await TrySendEvent(response, "heartbeat",
@@ -89,7 +89,7 @@ public sealed class MissionSseService(
             session.DeltaVKmS = dest.DeltaVKmS;
 
             // Delay without ct so a client disconnect doesn't abort the loop
-            await Task.Delay(500);
+            await Task.Delay(3_000);
         }
 
         // ── session_complete — always fires ───────────────────────────────
