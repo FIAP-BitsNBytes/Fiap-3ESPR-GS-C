@@ -52,6 +52,4 @@ public static class KnownDestinations
 
     public static MissionDestination? FindById(string id) =>
         All.FirstOrDefault(d => string.Equals(d.Id, id, StringComparison.OrdinalIgnoreCase));
-
-    public static MissionDestination? Get(string id) => FindById(id);
 }

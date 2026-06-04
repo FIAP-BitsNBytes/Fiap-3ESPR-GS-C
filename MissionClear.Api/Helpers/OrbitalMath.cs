@@ -21,6 +21,9 @@ public static class OrbitalMath
 
     public static double Gmst(DateTime utc)
     {
+        if (utc.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("UTC DateTime required.", nameof(utc));
+
         var jd = 367.0 * utc.Year
             - (int)(7.0 * (utc.Year + (int)((utc.Month + 9.0) / 12.0)) / 4.0)
             + (int)(275.0 * utc.Month / 9.0)

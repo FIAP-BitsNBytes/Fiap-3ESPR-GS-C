@@ -53,16 +53,26 @@ public sealed class LaunchWindowsController(
         [FromQuery] string? from,
         [FromQuery] string? to,
         [FromQuery] int     count   = 5,
-        [FromQuery] double  maxRisk = 0.3)
+        [FromQuery] double  maxRisk = 0.8)
     {
+        if (count is <= 0 or > 20)
+            throw new DomainException("INVALID_PARAMETER", "'count' must be between 1 and 20.", 400);
+
+        if (maxRisk is < 0.0 or > 1.0)
+            throw new DomainException("INVALID_PARAMETER", "'max_risk' must be between 0.0 and 1.0.", 400);
+
         ParseAndValidate(destination, from, to, out var dest, out var fromDt, out var toDt);
         var debris  = RequireCache();
         var windows = calculator.Calculate(dest, fromDt, toDt, debris);
 
-        var best = windows
-            .Where(w => w.RiskScore <= maxRisk)
+        // Always return top-N by risk. Apply maxRisk filter only when it yields results;
+        // fall back to best available so the client is never left with an empty list.
+        var filtered = windows.Where(w => w.RiskScore <= maxRisk).ToList();
+        var source   = filtered.Count > 0 ? filtered : (IEnumerable<LaunchWindow>)windows;
+
+        var best = source
             .OrderBy(w => w.RiskScore)
-            .Take(Math.Min(count, 20))
+            .Take(count)
             .Select((w, i) => new BestWindowDto(
                 i + 1,
                 w.Start.ToString("O"), w.End.ToString("O"),
@@ -122,6 +132,10 @@ public sealed class LaunchWindowsController(
 
         fromDt = fromDt.ToUniversalTime();
         toDt   = toDt.ToUniversalTime();
+
+        if (toDt <= fromDt)
+            throw new DomainException("INVALID_DATE_RANGE",
+                "'to' must be after 'from'.", 400);
 
         if ((toDt - fromDt).TotalHours > 48)
             throw new DomainException("TIME_RANGE_EXCEEDED",

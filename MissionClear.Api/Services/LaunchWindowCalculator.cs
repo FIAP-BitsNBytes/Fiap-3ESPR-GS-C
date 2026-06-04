@@ -26,6 +26,10 @@ public sealed class LaunchWindowCalculator : ILaunchWindowCalculator
     {
         ArgumentNullException.ThrowIfNull(destination);
         ArgumentNullException.ThrowIfNull(debris);
+        if (from.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("UTC DateTime required.", nameof(from));
+        if (to.Kind != DateTimeKind.Utc)
+            throw new ArgumentException("UTC DateTime required.", nameof(to));
 
         var windows = new List<LaunchWindow>();
         var current = from;
@@ -43,7 +47,7 @@ public sealed class LaunchWindowCalculator : ILaunchWindowCalculator
                 RiskScore:     Math.Round(riskScore, 4),
                 DeltaVKmS:     destination.DeltaVKmS,
                 DurationHours: destination.MissionDurationHours,
-                IsRecommended: riskScore < 0.1,
+                IsRecommended: riskScore < 0.7,
                 Conjunctions:  conjunctions));
 
             current = slotEnd;
