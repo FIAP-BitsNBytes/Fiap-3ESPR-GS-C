@@ -43,7 +43,6 @@ public sealed class MissionEntity
 
     /// <summary>JSON array of obstacle objects — serialized at Service layer.</summary>
     [Column("obstacles_json")]
-    [MaxLength(8000)]
     public string ObstaclesJson { get; set; } = "[]";
 
     [Column("created_at")]
