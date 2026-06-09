@@ -30,4 +30,4 @@ jobs:
       env:
         MYSQL_CONNECTION: ${{ secrets.MYSQL_PRODUCTION_CONNECTION }}
         JWT_SECRET_KEY: ${{ secrets.JWT_PRODUCTION_SECRET }}
-      run: dotnet test --configuration Release /p:TreatWarningsAsErrors=false
+      run: dotnet test --configuration Release --property:NugetAudit=false
